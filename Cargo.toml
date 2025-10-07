@@ -1,0 +1,9 @@
+[package]
+name = "bevy-wgpu-demo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.16.1"
+bytemuck = "1.23.2"
+lib_first_person_camera = { path = "./lib_first_person_camera" }
