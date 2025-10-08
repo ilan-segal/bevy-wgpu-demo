@@ -23,7 +23,7 @@ impl<CameraMarker: Component> Plugin for FirstPersonCameraPlugin<CameraMarker> {
             .init_resource::<CameraMouseSensitivity>()
             .init_resource::<CameraSpeed>()
             .add_systems(
-                Update,
+                PreUpdate,
                 (
                     add_pitch_yaw::<CameraMarker>,
                     (
@@ -128,8 +128,18 @@ fn update_pitch_yaw<CameraMarker: Component>(
     sensitivity: Res<CameraMouseSensitivity>,
 ) {
     for ev in evr_motion.read() {
-        let x = controls.mouse_x_inverted.then_some(-1.).unwrap_or(1.) * sensitivity.x * ev.delta.x;
-        let y = controls.mouse_y_inverted.then_some(-1.).unwrap_or(1.) * sensitivity.y * ev.delta.y;
+        let x = controls
+            .mouse_x_inverted
+            .then_some(-1.)
+            .unwrap_or(1.)
+            * sensitivity.x
+            * ev.delta.x;
+        let y = controls
+            .mouse_y_inverted
+            .then_some(-1.)
+            .unwrap_or(1.)
+            * sensitivity.y
+            * ev.delta.y;
         for mut pitch_yaw in q_camera.iter_mut() {
             pitch_yaw.add_pitch(y);
             pitch_yaw.add_yaw(x);
@@ -163,10 +173,18 @@ fn move_camera_from_keyboard_input<CameraMarker: Component>(
             d += transform.right().as_vec3();
         }
         if keys.pressed(controls.forward) {
-            d += transform.forward().as_vec3().with_y(0.).normalize();
+            d += transform
+                .forward()
+                .as_vec3()
+                .with_y(0.)
+                .normalize();
         }
         if keys.pressed(controls.backward) {
-            d += transform.back().as_vec3().with_y(0.).normalize();
+            d += transform
+                .back()
+                .as_vec3()
+                .with_y(0.)
+                .normalize();
         }
         if keys.pressed(controls.up) {
             d += Vec3::Y;

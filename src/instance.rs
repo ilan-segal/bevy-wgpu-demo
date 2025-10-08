@@ -10,38 +10,38 @@ pub struct Instance {
     pub normal: Normal,
 }
 
-pub const CUBE_FACE_INSTANCES: &[Instance; 6] = &[
-    Instance {
-        position: UVec3::ZERO,
-        dimensions: UVec2::ONE,
-        normal: Normal::PosX,
-    },
-    Instance {
-        position: UVec3::ZERO,
-        dimensions: UVec2::ONE,
-        normal: Normal::NegX,
-    },
-    Instance {
-        position: UVec3::ZERO,
-        dimensions: UVec2::ONE,
-        normal: Normal::PosY,
-    },
-    Instance {
-        position: UVec3::ZERO,
-        dimensions: UVec2::ONE,
-        normal: Normal::NegY,
-    },
-    Instance {
-        position: UVec3::ZERO,
-        dimensions: UVec2::ONE,
-        normal: Normal::PosZ,
-    },
-    Instance {
-        position: UVec3::ZERO,
-        dimensions: UVec2::ONE,
-        normal: Normal::NegZ,
-    },
-];
+// pub const CUBE_FACE_INSTANCES: &[Instance; 6] = &[
+//     Instance {
+//         position: UVec3::ZERO,
+//         dimensions: UVec2::ONE,
+//         normal: Normal::PosX,
+//     },
+//     Instance {
+//         position: UVec3::ZERO,
+//         dimensions: UVec2::ONE,
+//         normal: Normal::NegX,
+//     },
+//     Instance {
+//         position: UVec3::ZERO,
+//         dimensions: UVec2::ONE,
+//         normal: Normal::PosY,
+//     },
+//     Instance {
+//         position: UVec3::ZERO,
+//         dimensions: UVec2::ONE,
+//         normal: Normal::NegY,
+//     },
+//     Instance {
+//         position: UVec3::ZERO,
+//         dimensions: UVec2::ONE,
+//         normal: Normal::PosZ,
+//     },
+//     Instance {
+//         position: UVec3::ZERO,
+//         dimensions: UVec2::ONE,
+//         normal: Normal::NegZ,
+//     },
+// ];
 
 /**
 All block face data in four bytes:

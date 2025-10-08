@@ -35,7 +35,7 @@ use bevy::{
     },
     time::common_conditions::on_timer,
     ui::graph::NodeUi,
-    window::{CursorGrabMode, PrimaryWindow, WindowResized},
+    window::{CursorGrabMode, PresentMode, PrimaryWindow, WindowResized},
 };
 use lib_first_person_camera::FirstPersonCameraPlugin;
 
@@ -53,7 +53,13 @@ mod vertex;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    present_mode: PresentMode::AutoNoVsync,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
             MyRenderPlugin,
             // LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin::default(),
@@ -361,8 +367,8 @@ fn init_pipeline(
         step_mode: VertexStepMode::Instance,
         attributes: &DetailedInstanceRaw::desc(),
     };
-    const INSTANCES_PER_ROW: u32 = 1000;
-    const INSTANCES_ROWS: u32 = 1000;
+    const INSTANCES_PER_ROW: u32 = 3000;
+    const INSTANCES_ROWS: u32 = 3000;
     const SPACING: f32 = 1.1;
     let instances_raw = (0..INSTANCES_PER_ROW * INSTANCES_ROWS)
         .map(|i| (i % INSTANCES_PER_ROW, i / INSTANCES_PER_ROW))
@@ -550,8 +556,10 @@ fn update_camera_projection_matrix(
             return;
         }
     };
-    let projection_matrix =
-        projection.get_clip_from_view() * camera_transform.compute_matrix().inverse();
+    let projection_matrix = projection.get_clip_from_view()
+        * camera_transform
+            .compute_matrix()
+            .inverse();
     matrix.0 = projection_matrix;
 }
 
@@ -567,7 +575,9 @@ impl ViewNode for MyRenderNode {
             return;
         }
         // Update globals buffer
-        let projection_matrix = world.resource::<CameraProjectionMatrix>().0;
+        let projection_matrix = world
+            .resource::<CameraProjectionMatrix>()
+            .0;
         let StartupTime(startup_time) = world.resource::<StartupTime>();
         let elapsed_seconds = startup_time.elapsed().as_secs_f32();
         let globals = Globals::new(elapsed_seconds, projection_matrix.to_cols_array_2d());
@@ -619,7 +629,11 @@ impl ViewNode for MyRenderNode {
                 view,
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear(Color::linear_rgb(0.1, 0.2, 0.4).to_linear().into()),
+                    load: LoadOp::Clear(
+                        Color::linear_rgb(0.1, 0.2, 0.4)
+                            .to_linear()
+                            .into(),
+                    ),
                     store: StoreOp::Store,
                 },
             };
@@ -639,7 +653,9 @@ impl ViewNode for MyRenderNode {
                 occlusion_query_set: None,
             };
 
-            let mut pass = render_context.command_encoder().begin_render_pass(&desc);
+            let mut pass = render_context
+                .command_encoder()
+                .begin_render_pass(&desc);
             pass.set_pipeline(&pipeline.pipeline);
             pass.set_bind_group(0, globals_uniform_bind_group, &[]);
             pass.set_bind_group(1, texture_bind_group, &[]);
