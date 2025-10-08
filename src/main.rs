@@ -361,8 +361,8 @@ fn init_pipeline(
         step_mode: VertexStepMode::Instance,
         attributes: &DetailedInstanceRaw::desc(),
     };
-    const INSTANCES_PER_ROW: u32 = 20;
-    const INSTANCES_ROWS: u32 = 20;
+    const INSTANCES_PER_ROW: u32 = 1000;
+    const INSTANCES_ROWS: u32 = 1000;
     const SPACING: f32 = 1.1;
     let instances_raw = (0..INSTANCES_PER_ROW * INSTANCES_ROWS)
         .map(|i| (i % INSTANCES_PER_ROW, i / INSTANCES_PER_ROW))
@@ -380,6 +380,7 @@ fn init_pipeline(
         })
         .map(DetailedInstanceRaw::from)
         .collect::<Vec<_>>();
+    info!("{} instances to load.", instances_raw.len());
     let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
         label: Some("Instance buffer"),
         contents: bytemuck::cast_slice(instances_raw.as_slice()),

@@ -47,6 +47,7 @@ pub struct CameraControls {
     pub down: KeyCode,
     pub mouse_x_inverted: bool,
     pub mouse_y_inverted: bool,
+    pub speed_up: KeyCode,
 }
 
 impl Default for CameraControls {
@@ -60,6 +61,7 @@ impl Default for CameraControls {
             down: KeyCode::ShiftLeft,
             mouse_x_inverted: false,
             mouse_y_inverted: false,
+            speed_up: KeyCode::ControlLeft,
         }
     }
 }
@@ -175,6 +177,11 @@ fn move_camera_from_keyboard_input<CameraMarker: Component>(
         if d != Vec3::ZERO {
             d = d.normalize();
         }
-        transform.translation += d * speed.0;
+        let factor = if keys.pressed(controls.speed_up) {
+            10.0
+        } else {
+            1.0
+        };
+        transform.translation += d * factor * speed.0;
     }
 }
