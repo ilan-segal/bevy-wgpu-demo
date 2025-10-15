@@ -308,7 +308,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bytemuck",
+ "lib_chunk",
  "lib_first_person_camera",
+ "lib_spatial",
+ "lib_spatial_macro",
 ]
 
 [[package]]
@@ -2581,10 +2584,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "lib_chunk"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "lib_spatial",
+]
+
+[[package]]
 name = "lib_first_person_camera"
 version = "0.1.0"
 dependencies = [
  "bevy",
+]
+
+[[package]]
+name = "lib_spatial"
+version = "0.1.0"
+
+[[package]]
+name = "lib_spatial_macro"
+version = "0.1.0"
+dependencies = [
+ "lib_spatial",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
