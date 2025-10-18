@@ -312,6 +312,7 @@ dependencies = [
  "lib_first_person_camera",
  "lib_spatial",
  "lib_spatial_macro",
+ "lib_utils",
 ]
 
 [[package]]
@@ -2589,6 +2590,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "lib_spatial",
+ "lib_utils",
 ]
 
 [[package]]
@@ -2610,6 +2612,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "lib_utils"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.14.0",
 ]
 
 [[package]]
