@@ -13,6 +13,12 @@ impl From<IVec3> for ChunkPosition {
     }
 }
 
+impl From<(i32, i32, i32)> for ChunkPosition {
+    fn from(value: (i32, i32, i32)) -> Self {
+        Self(IVec3::from(value))
+    }
+}
+
 impl From<ChunkPosition> for IVec3 {
     fn from(value: ChunkPosition) -> Self {
         value.0

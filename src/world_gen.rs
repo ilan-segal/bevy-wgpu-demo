@@ -13,8 +13,17 @@ pub struct WorldGenerationPlugin;
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldSeed(0xDEADBEEF))
-            .add_systems(Startup, init_height_noise_generator)
+            .add_systems(
+                Startup,
+                (init_height_noise_generator, spawn_chunks_in_center_of_world),
+            )
             .add_systems(Update, assign_height_noise);
+    }
+}
+
+fn spawn_chunks_in_center_of_world(mut commands: Commands) {
+    for chunk_position in cube_iter(-2..=2).map(ChunkPosition::from) {
+        commands.spawn((Chunk, chunk_position));
     }
 }
 
@@ -41,9 +50,10 @@ struct HeightNoise(Vec<f64>);
 
 impl HeightNoise {
     fn from_noise(chunk_position: &ChunkPosition, noise: &FractalNoise) -> Self {
+        let offset = chunk_position.0 * CHUNK_SIZE as i32;
         let values = cube_iter(0..CHUNK_SIZE as i32)
             .map(IVec3::from)
-            .map(|pos| pos + chunk_position.0)
+            .map(|pos| pos + offset)
             .map(|pos| [pos.x, pos.z])
             .map(|point| noise.get(point))
             .collect();
