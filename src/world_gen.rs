@@ -21,16 +21,14 @@ impl Plugin for WorldGenerationPlugin {
             ))
             .add_systems(
                 Startup,
-                (init_height_noise_generator, spawn_chunks_in_center_of_world),
+                (init_height_noise_generator, spawn_chunk_at_center_of_world),
             )
             .add_systems(Update, (assign_height_noise, assign_blocks));
     }
 }
 
-fn spawn_chunks_in_center_of_world(mut commands: Commands) {
-    for chunk_position in cube_iter(-2..=2).map(ChunkPosition::from) {
-        commands.spawn((Chunk, chunk_position));
-    }
+fn spawn_chunk_at_center_of_world(mut commands: Commands) {
+    commands.spawn((Chunk, ChunkPosition(IVec3::ZERO)));
 }
 
 #[derive(Resource)]
