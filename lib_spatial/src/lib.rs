@@ -14,6 +14,15 @@ pub trait SpatiallyMapped<const DIM: usize> {
     fn at_pos(&self, pos: [Self::Index; DIM]) -> &Self::Item;
 }
 
+impl<T> SpatiallyMapped<2> for Vec<T> {
+    type Index = usize;
+    type Item = T;
+    fn at_pos(&self, pos: [usize; 2]) -> &T {
+        let i = pos_to_index_2d(pos);
+        return &self[i];
+    }
+}
+
 impl<T> SpatiallyMapped<3> for Vec<T> {
     type Index = usize;
     type Item = T;

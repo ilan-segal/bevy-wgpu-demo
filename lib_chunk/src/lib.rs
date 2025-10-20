@@ -83,6 +83,14 @@ pub struct NeighborhoodPlugin<T: Component> {
     _phantom: PhantomData<T>,
 }
 
+impl<T: Component> NeighborhoodPlugin<T> {
+    pub fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+}
+
 impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
     fn build(&self, app: &mut App) {
         app.add_event::<NeighborUpdateEvent<T>>()
@@ -125,7 +133,7 @@ fn update_component_copy<T: Component + Clone>(
 
 #[derive(Component, Default)]
 pub struct Neighborhood<T> {
-    pub chunks: [Option<Arc<T>>; 9],
+    pub chunks: [Option<Arc<T>>; 27],
 }
 
 impl<T> Neighborhood<T> {
@@ -215,7 +223,7 @@ fn populate_neighborhood<T: Component + Clone>(
     } in er.read()
     {
         let mut neighborhood = Neighborhood::<T> {
-            chunks: [const { None }; 9],
+            chunks: [const { None }; 27],
         };
         for (x, y, z) in cube_iter(-1..=1) {
             let offset = IVec3::new(x, y, z);

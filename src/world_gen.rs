@@ -1,23 +1,26 @@
 use std::num::NonZero;
 
-use bevy::prelude::*;
-use lib_chunk::ChunkPosition;
+use bevy::{ecs::query::QueryData, prelude::*};
+use lib_chunk::{ChunkPosition, NeighborhoodPlugin};
 use lib_noise::FractalNoise;
 use lib_spatial::{CHUNK_SIZE, SpatiallyMapped};
-use lib_spatial_macro::SpatiallyMapped3d;
-use lib_utils::cube_iter;
+use lib_spatial_macro::{SpatiallyMapped2d, SpatiallyMapped3d};
+use lib_utils::{cube_iter, square_iter};
 use noise::NoiseFn;
+
+use crate::block::Block;
 
 pub struct WorldGenerationPlugin;
 
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldSeed(0xDEADBEEF))
+            .add_plugins(NeighborhoodPlugin::<HeightNoise>::new())
             .add_systems(
                 Startup,
                 (init_height_noise_generator, spawn_chunks_in_center_of_world),
             )
-            .add_systems(Update, assign_height_noise);
+            .add_systems(Update, (assign_height_noise, assign_blocks));
     }
 }
 
@@ -45,16 +48,14 @@ fn init_height_noise_generator(mut commands: Commands, world_seed: Res<WorldSeed
 #[derive(Component)]
 struct Chunk;
 
-#[derive(Component, SpatiallyMapped3d)]
+#[derive(Component, Clone, SpatiallyMapped2d)]
 struct HeightNoise(Vec<f64>);
 
 impl HeightNoise {
     fn from_noise(chunk_position: &ChunkPosition, noise: &FractalNoise) -> Self {
         let offset = chunk_position.0 * CHUNK_SIZE as i32;
-        let values = cube_iter(0..CHUNK_SIZE as i32)
-            .map(IVec3::from)
-            .map(|pos| pos + offset)
-            .map(|pos| [pos.x, pos.z])
+        let values = square_iter(0..CHUNK_SIZE as i32)
+            .map(|(x, z)| [x + offset.x, z + offset.z])
             .map(|point| noise.get(point))
             .collect();
         Self(values)
@@ -69,5 +70,37 @@ fn assign_height_noise(
     for (entity, chunk_position) in q_chunks.iter() {
         let height_noise = HeightNoise::from_noise(chunk_position, &generator.0);
         commands.entity(entity).try_insert(height_noise);
+    }
+}
+
+#[derive(QueryData)]
+struct BlockGenerationData {
+    entity: Entity,
+    chunk_position: &'static ChunkPosition,
+    height_noise: &'static HeightNoise,
+}
+
+#[derive(Component, SpatiallyMapped3d)]
+struct Blocks(Vec<Block>);
+
+fn assign_blocks(
+    mut commands: Commands,
+    q_chunks: Query<BlockGenerationData, (With<Chunk>, Without<Blocks>)>,
+) {
+    const WORLD_AMPLITUDE: f64 = 10.;
+    for item in q_chunks.iter() {
+        let chunk_y = item.chunk_position.0.y * CHUNK_SIZE as i32;
+        let blocks = cube_iter(0..CHUNK_SIZE)
+            .map(|(x, y, z)| {
+                let height_sample = *item.height_noise.at_pos([x, z]);
+                let scaled_y = (y as i32 + chunk_y) as f64 / WORLD_AMPLITUDE;
+                if scaled_y < height_sample {
+                    Block::Stone
+                } else {
+                    Block::Air
+                }
+            })
+            .collect();
+        commands.entity(item.entity).try_insert(Blocks(blocks));
     }
 }

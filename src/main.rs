@@ -47,6 +47,7 @@ use crate::{
     world_gen::WorldGenerationPlugin,
 };
 
+mod block;
 mod globals;
 mod instance;
 mod normal;
