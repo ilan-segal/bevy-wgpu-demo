@@ -34,10 +34,10 @@ pub fn derive_spatial_3d(input: TokenStream) -> TokenStream {
                 where
                     #inner_ty: SpatiallyMapped<3>,
                 {
-                    type Item = #inner_ty::Item;
-                    type Index = #inner_ty::Index;
+                    type Item = <#inner_ty as SpatiallyMapped<3>>::Item;
+                    type Index = <#inner_ty as SpatiallyMapped<3>>::Index;
 
-                    fn at_pos(&self, pos: [usize; Self::DIM]) -> &Self::Item {
+                    fn at_pos(&self, pos: [usize; 3]) -> &Self::Item {
                         self.0.at_pos(pos)
                     }
                 }

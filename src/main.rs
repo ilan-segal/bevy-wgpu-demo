@@ -44,12 +44,14 @@ use crate::{
     globals::Globals,
     instance::{DetailedInstance, DetailedInstanceRaw},
     vertex::{INDICES, ModelVertex, VERTICES},
+    world_gen::WorldGenerationPlugin,
 };
 
 mod globals;
 mod instance;
 mod normal;
 mod vertex;
+mod world_gen;
 
 fn main() {
     App::new()
@@ -66,6 +68,7 @@ fn main() {
             FrameTimeDiagnosticsPlugin::default(),
             FirstPersonCameraPlugin::<RenderCamera>::new(),
             ChunkIndexPlugin,
+            WorldGenerationPlugin,
         ))
         .add_systems(
             Startup,

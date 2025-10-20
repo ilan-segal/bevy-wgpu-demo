@@ -1,11 +1,11 @@
 pub const CHUNK_SIZE: usize = 32;
 
 pub fn pos_to_index_3d([x, y, z]: [usize; 3]) -> usize {
-    x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE
+    z + y * CHUNK_SIZE + x * CHUNK_SIZE * CHUNK_SIZE
 }
 
 pub fn pos_to_index_2d([x, y]: [usize; 2]) -> usize {
-    x + y * CHUNK_SIZE
+    y + x * CHUNK_SIZE
 }
 
 pub trait SpatiallyMapped<const DIM: usize> {

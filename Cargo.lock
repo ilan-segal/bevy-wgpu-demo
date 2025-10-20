@@ -314,6 +314,7 @@ dependencies = [
  "lib_spatial",
  "lib_spatial_macro",
  "lib_utils",
+ "noise",
 ]
 
 [[package]]
