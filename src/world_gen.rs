@@ -15,7 +15,10 @@ pub struct WorldGenerationPlugin;
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldSeed(0xDEADBEEF))
-            .add_plugins(NeighborhoodPlugin::<HeightNoise>::new())
+            .add_plugins((
+                NeighborhoodPlugin::<HeightNoise>::new(),
+                NeighborhoodPlugin::<Blocks>::new(),
+            ))
             .add_systems(
                 Startup,
                 (init_height_noise_generator, spawn_chunks_in_center_of_world),
@@ -80,7 +83,7 @@ struct BlockGenerationData {
     height_noise: &'static HeightNoise,
 }
 
-#[derive(Component, SpatiallyMapped3d)]
+#[derive(Component, Clone, SpatiallyMapped3d)]
 struct Blocks(Vec<Block>);
 
 fn assign_blocks(
