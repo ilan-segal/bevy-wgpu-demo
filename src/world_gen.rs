@@ -94,8 +94,8 @@ fn assign_blocks(
         let blocks = cube_iter(0..CHUNK_SIZE)
             .map(|(x, y, z)| {
                 let height_sample = *item.height_noise.at_pos([x, z]);
-                let scaled_y = (y as i32 + chunk_y) as f64 / WORLD_AMPLITUDE;
-                if scaled_y < height_sample {
+                let true_y = (y as i32 + chunk_y) as f64;
+                if true_y < height_sample * WORLD_AMPLITUDE {
                     Block::Stone
                 } else {
                     Block::Air
