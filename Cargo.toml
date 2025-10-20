@@ -11,3 +11,4 @@ lib_first_person_camera = { path = "./lib_first_person_camera" }
 lib_spatial = { path = "./lib_spatial" }
 lib_spatial_macro = { path = "./lib_spatial_macro" }
 lib_utils = { path = "./lib_utils" }
+lib_noise = { path = "./lib_noise" }
