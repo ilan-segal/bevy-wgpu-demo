@@ -59,3 +59,12 @@ where
         self.parts.iter().map(|noise| noise.get(point)).sum::<f64>() * self.inverse_of_sum_of_scales
     }
 }
+
+impl<const DIM: usize> NoiseFn<i32, DIM> for FractalNoise
+where
+    FractalNoise: NoiseFn<f64, DIM>,
+{
+    fn get(&self, point: [i32; DIM]) -> f64 {
+        self.get(point.map(|x| x as f64))
+    }
+}
