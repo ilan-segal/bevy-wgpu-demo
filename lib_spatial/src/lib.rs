@@ -17,7 +17,7 @@ pub trait SpatiallyMapped<const DIM: usize> {
 impl<T> SpatiallyMapped<2> for Vec<T> {
     type Index = usize;
     type Item = T;
-    fn at_pos(&self, pos: [usize; 2]) -> &T {
+    fn at_pos(&self, pos: [Self::Index; 2]) -> &T {
         let i = pos_to_index_2d(pos);
         return &self[i];
     }
@@ -26,7 +26,7 @@ impl<T> SpatiallyMapped<2> for Vec<T> {
 impl<T> SpatiallyMapped<3> for Vec<T> {
     type Index = usize;
     type Item = T;
-    fn at_pos(&self, pos: [usize; 3]) -> &T {
+    fn at_pos(&self, pos: [Self::Index; 3]) -> &T {
         let i = pos_to_index_3d(pos);
         return &self[i];
     }
