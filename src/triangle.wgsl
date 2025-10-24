@@ -43,78 +43,9 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     );
     var out: VertexOutput;
     out.clip_pos = globals.world_to_clip * model_matrix * vec4(in.position, 1.0);
-    let init_color = in.color;
-    var hsv = rgb_to_hsv(init_color);
-    hsv.x += globals.time_seconds;
-    let color = hsv_to_rgb(hsv);
-    out.color = vec4(color, 1.0);
+    out.color = vec4(in.color, 1.0);
     out.uv = in.uv;
     return out;
-}
-
-fn rgb_to_hsv(rgb: vec3<f32>) -> vec3<f32> {
-    let max_comp = max(rgb.r, max(rgb.g, rgb.b));
-    let min_comp = min(rgb.r, min(rgb.g, rgb.b));
-    let delta = max_comp - min_comp;
-
-    var h: f32 = 0.0;
-    var s: f32 = 0.0;
-    let v: f32 = max_comp;
-
-    if (delta == 0.0) { // Achromatic (gray)
-        h = 0.0;
-        s = 0.0;
-    } else {
-        if (max_comp != 0.0) {
-            s = delta / max_comp;
-        } else { // Black
-            s = 0.0;
-            h = 0.0; // or undefined, depending on desired behavior
-            return vec3<f32>(h, s, v);
-        }
-
-        if (max_comp == rgb.r) {
-            h = (rgb.g - rgb.b) / delta;
-        } else if (max_comp == rgb.g) {
-            h = (rgb.b - rgb.r) / delta + 2.0;
-        } else { // max_comp == rgb.b
-            h = (rgb.r - rgb.g) / delta + 4.0;
-        }
-        h = h / 6.0; // Normalize hue to [0, 1]
-        if (h < 0.0) {
-            h += 1.0;
-        }
-    }
-    return vec3<f32>(h, s, v) * vec3(2.0 * PI, 1.0, 1.0);
-}
-
-/// https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB
-fn hsv_to_rgb(hsv: vec3<f32>) -> vec3<f32> {
-    let h = (hsv.x / PI * 180.) % 360.;
-    let s = hsv.y;
-    let v = hsv.z;
-
-    let c = v * s;
-    let x = c * (1.0 - abs((h / 60.0) % 2.0 - 1.0));
-    let m = v - c;
-
-    var rgb_prime: vec3<f32>;
-
-    if (0.0 <= h && h < 60.0) {
-        rgb_prime = vec3<f32>(c, x, 0.0);
-    } else if (60.0 <= h && h < 120.0) {
-        rgb_prime = vec3<f32>(x, c, 0.0);
-    } else if (120.0 <= h && h < 180.0) {
-        rgb_prime = vec3<f32>(0.0, c, x);
-    } else if (180.0 <= h && h < 240.0) {
-        rgb_prime = vec3<f32>(0.0, x, c);
-    } else if (240.0 <= h && h < 300.0) {
-        rgb_prime = vec3<f32>(x, 0.0, c);
-    } else { // 300.0 <= h && h < 360.0
-        rgb_prime = vec3<f32>(c, 0.0, x);
-    }
-
-    return rgb_prime + vec3<f32>(m, m, m);
 }
 
 // Fragment shader

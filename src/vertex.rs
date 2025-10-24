@@ -33,22 +33,22 @@ impl ModelVertex {
 pub const VERTICES: &[ModelVertex] = &[
     ModelVertex {
         position: [-0.5, 0.5, 0.5],
-        color: [1.0, 0.0, 0.0],
+        color: [1.0, 1.0, 1.0],
         uv: [0., 0.],
     },
     ModelVertex {
         position: [-0.5, -0.5, 0.5],
-        color: [0.0, 1.0, 0.0],
+        color: [1.0, 1.0, 1.0],
         uv: [0., 1.],
     },
     ModelVertex {
         position: [0.5, 0.5, 0.5],
-        color: [0.0, 0.0, 1.0],
+        color: [1.0, 1.0, 1.0],
         uv: [1., 0.],
     },
     ModelVertex {
         position: [0.5, -0.5, 0.5],
-        color: [1.0, 0.0, 1.0],
+        color: [1.0, 1.0, 1.0],
         uv: [1., 1.],
     },
 ];
