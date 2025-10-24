@@ -9,9 +9,8 @@ var<uniform> globals: Globals;
 var my_texture: texture_2d<f32>;
 @group(1) @binding(1)
 var my_sampler: sampler;
-// Vertex shader
 
-const PI: f32 = 3.14159265;
+// Vertex shader
 
 struct VertexInput {
     @builtin(vertex_index) index: u32,
