@@ -47,7 +47,7 @@ fn init_height_noise_generator(mut commands: Commands, world_seed: Res<WorldSeed
 }
 
 #[derive(Component)]
-struct Chunk;
+pub struct Chunk;
 
 #[derive(Component, Clone, SpatiallyMapped2d)]
 struct HeightNoise(Vec<f64>);
@@ -82,7 +82,7 @@ struct BlockGenerationData {
 }
 
 #[derive(Component, Clone, SpatiallyMapped3d)]
-struct Blocks(Vec<Block>);
+pub struct Blocks(Vec<Block>);
 
 fn assign_blocks(
     mut commands: Commands,

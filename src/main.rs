@@ -43,6 +43,7 @@ use lib_first_person_camera::FirstPersonCameraPlugin;
 use crate::{
     globals::Globals,
     instance::{DetailedInstance, DetailedInstanceRaw},
+    mesh::{MeshingType, WorldMeshPlugin},
     vertex::{INDICES, ModelVertex, VERTICES},
     world_gen::WorldGenerationPlugin,
 };
@@ -50,6 +51,7 @@ use crate::{
 mod block;
 mod globals;
 mod instance;
+mod mesh;
 mod normal;
 mod vertex;
 mod world_gen;
@@ -70,7 +72,9 @@ fn main() {
             FirstPersonCameraPlugin::<RenderCamera>::new(),
             ChunkIndexPlugin,
             WorldGenerationPlugin,
+            WorldMeshPlugin,
         ))
+        .insert_resource(MeshingType::Naive)
         .add_systems(
             Startup,
             (setup_ui, load_stone_texture_handle, capture_mouse),
@@ -376,22 +380,23 @@ fn init_pipeline(
     const INSTANCES_PER_ROW: u32 = 1000;
     const INSTANCES_ROWS: u32 = 1000;
     const SPACING: f32 = 1.1;
-    let instances_raw = (0..INSTANCES_PER_ROW * INSTANCES_ROWS)
-        .map(|i| (i % INSTANCES_PER_ROW, i / INSTANCES_PER_ROW))
-        .map(|(x, z)| {
-            let x = x as f32;
-            let z = z as f32;
-            let translation = Vec3::new(-x * SPACING, 0.0, -z * SPACING);
-            let rotation = Quat::from_rotation_y(TAU * 0.04 * ((x * 0.5).sin() + 1.0))
-                * Quat::from_rotation_z(TAU * 0.1 * (((x + z) * 0.5).sin() + 1.0))
-                * Quat::from_rotation_x(TAU * 0.05 * (((x + z) * 0.5).sin() + 1.0));
-            DetailedInstance {
-                translation,
-                rotation,
-            }
-        })
-        .map(DetailedInstanceRaw::from)
-        .collect::<Vec<_>>();
+    // let instances_raw = (0..INSTANCES_PER_ROW * INSTANCES_ROWS)
+    //     .map(|i| (i % INSTANCES_PER_ROW, i / INSTANCES_PER_ROW))
+    //     .map(|(x, z)| {
+    //         let x = x as f32;
+    //         let z = z as f32;
+    //         let translation = Vec3::new(-x * SPACING, 0.0, -z * SPACING);
+    //         let rotation = Quat::from_rotation_y(TAU * 0.04 * ((x * 0.5).sin() + 1.0))
+    //             * Quat::from_rotation_z(TAU * 0.1 * (((x + z) * 0.5).sin() + 1.0))
+    //             * Quat::from_rotation_x(TAU * 0.05 * (((x + z) * 0.5).sin() + 1.0));
+    //         DetailedInstance {
+    //             translation,
+    //             rotation,
+    //         }
+    //     })
+    //     .map(DetailedInstanceRaw::from)
+    //     .collect::<Vec<_>>();
+    let instances_raw = Vec::<DetailedInstanceRaw>::new();
     info!("{} instances to load.", instances_raw.len());
     let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
         label: Some("Instance buffer"),
@@ -655,10 +660,12 @@ impl ViewNode for MyRenderNode {
             pass.set_pipeline(&pipeline.pipeline);
             pass.set_bind_group(0, globals_uniform_bind_group, &[]);
             pass.set_bind_group(1, texture_bind_group, &[]);
-            pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
-            pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
             pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
-            pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
+            pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
+            if num_instances > &0 {
+                pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
+                pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
+            }
         }
 
         Ok(())
