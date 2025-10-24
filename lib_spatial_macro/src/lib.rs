@@ -37,7 +37,7 @@ pub fn derive_spatial_3d(input: TokenStream) -> TokenStream {
                     type Item = <#inner_ty as SpatiallyMapped<3>>::Item;
                     type Index = <#inner_ty as SpatiallyMapped<3>>::Index;
 
-                    fn at_pos(&self, pos: [usize; 3]) -> &Self::Item {
+                    fn at_pos(&self, pos: [Self::Index; 3]) -> &Self::Item {
                         self.0.at_pos(pos)
                     }
                 }
@@ -89,7 +89,7 @@ pub fn derive_spatial_2d(input: TokenStream) -> TokenStream {
                     type Item = <#inner_ty as SpatiallyMapped<2>>::Item;
                     type Index = <#inner_ty as SpatiallyMapped<2>>::Index;
 
-                    fn at_pos(&self, pos: [usize; 2]) -> &Self::Item {
+                    fn at_pos(&self, pos: [Self::Index; 2]) -> &Self::Item {
                         self.0.at_pos(pos)
                     }
                 }
