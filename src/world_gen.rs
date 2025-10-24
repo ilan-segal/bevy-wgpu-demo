@@ -39,8 +39,8 @@ struct HeightNoiseGenerator(FractalNoise);
 
 fn init_height_noise_generator(mut commands: Commands, world_seed: Res<WorldSeed>) {
     let seed = world_seed.0;
-    let num_layers = 3;
-    let scale = 32.0;
+    let num_layers = 6;
+    let scale = 0.05;
     let noise = FractalNoise::new(seed, NonZero::new(num_layers).unwrap(), scale);
     let generator = HeightNoiseGenerator(noise);
     commands.insert_resource(generator);

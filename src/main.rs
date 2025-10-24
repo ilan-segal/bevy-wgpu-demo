@@ -1,5 +1,4 @@
 use std::{
-    f32::consts::TAU,
     ops::Deref,
     time::{Duration, Instant},
 };
@@ -43,7 +42,7 @@ use lib_first_person_camera::FirstPersonCameraPlugin;
 use crate::{
     globals::Globals,
     instance::{DetailedInstance, DetailedInstanceRaw},
-    mesh::{MeshingType, WorldMeshPlugin},
+    mesh::{MeshingType, Quad, Quads, WorldMeshPlugin},
     vertex::{INDICES, ModelVertex, VERTICES},
     world_gen::WorldGenerationPlugin,
 };
@@ -172,6 +171,7 @@ impl Plugin for MyRenderPlugin {
                         .chain()
                         .run_if(resource_exists::<PipelineIsNotInitialized>),
                     update_camera_projection_matrix,
+                    update_instance_buffer,
                     resize_depth_texture,
                 ),
             );
@@ -377,9 +377,9 @@ fn init_pipeline(
         step_mode: VertexStepMode::Instance,
         attributes: &DetailedInstanceRaw::desc(),
     };
-    const INSTANCES_PER_ROW: u32 = 1000;
-    const INSTANCES_ROWS: u32 = 1000;
-    const SPACING: f32 = 1.1;
+    // const INSTANCES_PER_ROW: u32 = 1000;
+    // const INSTANCES_ROWS: u32 = 1000;
+    // const SPACING: f32 = 1.1;
     // let instances_raw = (0..INSTANCES_PER_ROW * INSTANCES_ROWS)
     //     .map(|i| (i % INSTANCES_PER_ROW, i / INSTANCES_PER_ROW))
     //     .map(|(x, z)| {
@@ -570,6 +570,44 @@ fn update_camera_projection_matrix(
     let projection_matrix =
         projection.get_clip_from_view() * camera_transform.compute_matrix().inverse();
     matrix.0 = projection_matrix;
+}
+
+fn update_instance_buffer(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    q_quads: Extract<Query<&Quads, Changed<Quads>>>,
+) {
+    let Ok(quads) = q_quads.single() else {
+        return;
+    };
+    let instances_raw = quads
+        .0
+        .iter()
+        .map(instance_from_quad)
+        .map(DetailedInstanceRaw::from)
+        .collect::<Vec<_>>();
+    let num_instances = instances_raw.len() as u32;
+    info!("{} instances", num_instances);
+    let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+        label: Some("Instance buffer"),
+        contents: bytemuck::cast_slice(instances_raw.as_slice()),
+        usage: BufferUsages::VERTEX,
+    });
+    commands.insert_resource(InstanceBuffer {
+        buffer,
+        num_instances,
+    });
+}
+
+fn instance_from_quad(quad: &Quad) -> DetailedInstance {
+    let translation = quad.pos.as_vec3();
+    let rotation = Transform::IDENTITY
+        .looking_to(quad.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y)
+        .rotation;
+    DetailedInstance {
+        translation,
+        rotation,
+    }
 }
 
 #[derive(Default)]

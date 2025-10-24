@@ -19,14 +19,14 @@ impl Plugin for WorldMeshPlugin {
 }
 
 #[derive(Component)]
-pub struct Quads(Vec<Quad>);
+pub struct Quads(pub Vec<Quad>);
 
 pub struct Quad {
-    block: Block,
-    normal: Normal,
-    width: NonZero<u32>,
-    height: NonZero<u32>,
-    pos: IVec3,
+    pub block: Block,
+    pub normal: Normal,
+    pub width: NonZero<u32>,
+    pub height: NonZero<u32>,
+    pub pos: IVec3,
 }
 
 #[derive(Resource)]
