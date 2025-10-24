@@ -607,7 +607,6 @@ fn instance_from_quad(quad: &Quad) -> DetailedInstance {
     DetailedInstance {
         translation,
         rotation,
-        ambient_occlusions: quad.ambient_occlusions,
     }
 }
 

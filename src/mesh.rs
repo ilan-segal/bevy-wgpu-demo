@@ -21,14 +21,12 @@ impl Plugin for WorldMeshPlugin {
 #[derive(Component)]
 pub struct Quads(pub Vec<Quad>);
 
-#[allow(unused)]
 pub struct Quad {
     pub block: Block,
     pub normal: Normal,
     pub width: NonZero<u32>,
     pub height: NonZero<u32>,
     pub pos: IVec3,
-    pub ambient_occlusions: [u8; 4],
 }
 
 #[derive(Resource)]
@@ -59,7 +57,8 @@ fn get_quads(blocks: &Neighborhood<Blocks>, meshing_type: &MeshingType) -> Vec<Q
 
 fn get_quads_naive(blocks: &Neighborhood<Blocks>) -> Vec<Quad> {
     cube_iter(0..32)
-        .flat_map(|pos| get_quads_around_block(blocks, pos.into()))
+        .map(|(x, y, z)| [x, y, z])
+        .flat_map(|pos| get_quads_around_block(blocks, pos))
         .collect()
 }
 
@@ -99,7 +98,6 @@ fn get_quad_on_face(blocks: &Neighborhood<Blocks>, pos: [i32; 3], normal: &Norma
         width: NonZero::new(1).unwrap(),
         height: NonZero::new(1).unwrap(),
         pos: pos.into(),
-        ambient_occlusions: [0; 4], // TODO
     };
     return Some(quad);
 }

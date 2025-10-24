@@ -8,7 +8,6 @@ pub struct Instance {
     pub position: UVec3,
     pub dimensions: UVec2,
     pub normal: Normal,
-    pub ambient_occlusions: [u8; 4],
 }
 
 // pub const CUBE_FACE_INSTANCES: &[Instance; 6] = &[
@@ -64,7 +63,6 @@ the range 0-31 and get away with using 5 bits.
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct InstanceRaw {
     data: u32,
-    ambient_occlusions: u32,
 }
 
 impl From<Instance> for InstanceRaw {
@@ -76,47 +74,31 @@ impl From<Instance> for InstanceRaw {
         data |= value.position.y << 16;
         data |= value.position.z << 22;
         data |= (value.normal as u32) << 28;
-        let ambient_occlusions = ((value.ambient_occlusions[0] as u32) << 0)
-            | ((value.ambient_occlusions[1] as u32) << 8)
-            | ((value.ambient_occlusions[2] as u32) << 16)
-            | ((value.ambient_occlusions[3] as u32) << 24);
-        return Self {
-            data,
-            ambient_occlusions,
-        };
+        return Self { data };
     }
 }
 
 pub struct DetailedInstance {
     pub translation: Vec3,
     pub rotation: Quat,
-    pub ambient_occlusions: [u8; 4],
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DetailedInstanceRaw {
     matrix_cols: [[f32; 4]; 4],
-    ambient_occlusions: u32,
 }
 
 impl From<DetailedInstance> for DetailedInstanceRaw {
     fn from(value: DetailedInstance) -> Self {
         let matrix = Mat4::from_translation(value.translation) * Mat4::from_quat(value.rotation);
         let matrix_cols = matrix.to_cols_array_2d();
-        let ambient_occlusions = ((value.ambient_occlusions[0] as u32) << 0)
-            | ((value.ambient_occlusions[1] as u32) << 8)
-            | ((value.ambient_occlusions[2] as u32) << 16)
-            | ((value.ambient_occlusions[3] as u32) << 24);
-        Self {
-            matrix_cols,
-            ambient_occlusions,
-        }
+        Self { matrix_cols }
     }
 }
 
 impl DetailedInstanceRaw {
-    pub fn desc() -> [VertexAttribute; 5] {
+    pub fn desc() -> [VertexAttribute; 4] {
         [
             VertexAttribute {
                 format: VertexFormat::Float32x4,
@@ -137,11 +119,6 @@ impl DetailedInstanceRaw {
                 format: VertexFormat::Float32x4,
                 offset: std::mem::size_of::<[f32; 12]>() as _,
                 shader_location: 6,
-            },
-            VertexAttribute {
-                format: VertexFormat::Float32,
-                offset: std::mem::size_of::<[f32; 16]>() as _,
-                shader_location: 7,
             },
         ]
     }
