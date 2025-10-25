@@ -1,6 +1,7 @@
 struct Globals {
     time_seconds: f32,
     world_to_clip: mat4x4<f32>,
+    ambient_light: vec3<f32>,
 }
 
 @group(0) @binding(0)
@@ -52,5 +53,5 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(my_texture, my_sampler, vertex.uv);
-    return vertex.color * color;
+    return vertex.color * color * vec4(globals.ambient_light, 1.0);
 }

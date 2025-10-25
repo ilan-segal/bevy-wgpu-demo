@@ -329,7 +329,7 @@ fn init_pipeline(
         Some("Globals bind group layout"),
         &[BindGroupLayoutEntry {
             binding: 0,
-            visibility: ShaderStages::VERTEX,
+            visibility: ShaderStages::VERTEX_FRAGMENT,
             ty: BindingType::Buffer {
                 ty: BufferBindingType::Uniform,
                 has_dynamic_offset: false,
@@ -622,10 +622,16 @@ impl ViewNode for MyRenderNode {
             return;
         }
         // Update globals buffer
-        let projection_matrix = world.resource::<CameraProjectionMatrix>().0;
+        let projection_matrix = world
+            .resource::<CameraProjectionMatrix>()
+            .0
+            .to_cols_array_2d();
         let StartupTime(startup_time) = world.resource::<StartupTime>();
         let elapsed_seconds = startup_time.elapsed().as_secs_f32();
-        let globals = Globals::new(elapsed_seconds, projection_matrix.to_cols_array_2d());
+        let mut globals = Globals::default();
+        globals.elapsed_seconds = elapsed_seconds;
+        globals.projection_matrix = projection_matrix;
+        globals.ambient_light = [0.1; 3];
         // info!("{:?}", camera_transform.compute_matrix());
         let render_queue = world.resource::<RenderQueue>();
         let buffer = world.resource::<GlobalsUniformBuffer>();
