@@ -1,9 +1,7 @@
 use std::{ops::Deref, time::Instant};
 
 use bevy::{
-    color::palettes::css::WHITE,
     core_pipeline::core_3d::graph::{Core3d, Node3d},
-    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     ecs::query::{QueryData, QuerySingleError},
     prelude::*,
     render::{
@@ -32,11 +30,11 @@ use bevy::{
     ui::graph::NodeUi,
     window::{CursorGrabMode, PresentMode, PrimaryWindow, WindowResized},
 };
-use iyes_perf_ui::prelude::*;
 use lib_chunk::ChunkIndexPlugin;
 use lib_first_person_camera::FirstPersonCameraPlugin;
 
 use crate::{
+    debug_hud::DebugHudPlugin,
     globals::Globals,
     instance::{DetailedInstance, DetailedInstanceRaw},
     mesh::{MeshingType, Quad, Quads, WorldMeshPlugin},
@@ -45,6 +43,7 @@ use crate::{
 };
 
 mod block;
+mod debug_hud;
 mod globals;
 mod instance;
 mod mesh;
@@ -62,9 +61,8 @@ fn main() {
                 }),
                 ..Default::default()
             }),
+            DebugHudPlugin,
             MyRenderPlugin,
-            FrameTimeDiagnosticsPlugin::default(),
-            PerfUiPlugin,
             FirstPersonCameraPlugin::<RenderCamera>::new(),
             ChunkIndexPlugin,
             WorldGenerationPlugin,
@@ -73,22 +71,9 @@ fn main() {
         .insert_resource(MeshingType::Naive)
         .add_systems(
             Startup,
-            (
-                spawn_camera,
-                spawn_perf_ui,
-                load_stone_texture_handle,
-                capture_mouse,
-            ),
+            (spawn_camera, load_stone_texture_handle, capture_mouse),
         )
         .run();
-}
-
-fn spawn_perf_ui(mut commands: Commands) {
-    commands.spawn((
-        PerfUiEntryFPSAverage::default(),
-        PerfUiEntryFPSPctLow::default(),
-        PerfUiEntryFrameTime::default(),
-    ));
 }
 
 fn capture_mouse(mut q_windows: Query<&mut Window, With<PrimaryWindow>>) {
