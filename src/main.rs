@@ -1,7 +1,4 @@
-use std::{
-    ops::Deref,
-    time::{Duration, Instant},
-};
+use std::{ops::Deref, time::Instant};
 
 use bevy::{
     color::palettes::css::WHITE,
@@ -32,10 +29,10 @@ use bevy::{
         texture::GpuImage,
         view::ViewTarget,
     },
-    time::common_conditions::on_timer,
     ui::graph::NodeUi,
     window::{CursorGrabMode, PresentMode, PrimaryWindow, WindowResized},
 };
+use iyes_perf_ui::prelude::*;
 use lib_chunk::ChunkIndexPlugin;
 use lib_first_person_camera::FirstPersonCameraPlugin;
 
@@ -66,8 +63,8 @@ fn main() {
                 ..Default::default()
             }),
             MyRenderPlugin,
-            // LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin::default(),
+            PerfUiPlugin,
             FirstPersonCameraPlugin::<RenderCamera>::new(),
             ChunkIndexPlugin,
             WorldGenerationPlugin,
@@ -76,13 +73,22 @@ fn main() {
         .insert_resource(MeshingType::Naive)
         .add_systems(
             Startup,
-            (setup_ui, load_stone_texture_handle, capture_mouse),
-        )
-        .add_systems(
-            Update,
-            update_fps_counter.run_if(on_timer(Duration::from_secs_f32(0.25))),
+            (
+                spawn_camera,
+                spawn_perf_ui,
+                load_stone_texture_handle,
+                capture_mouse,
+            ),
         )
         .run();
+}
+
+fn spawn_perf_ui(mut commands: Commands) {
+    commands.spawn((
+        PerfUiEntryFPSAverage::default(),
+        PerfUiEntryFPSPctLow::default(),
+        PerfUiEntryFrameTime::default(),
+    ));
 }
 
 fn capture_mouse(mut q_windows: Query<&mut Window, With<PrimaryWindow>>) {
@@ -99,28 +105,11 @@ fn capture_mouse(mut q_windows: Query<&mut Window, With<PrimaryWindow>>) {
 #[derive(Component)]
 struct RenderCamera;
 
-#[derive(Component)]
-struct UiFpsText;
-
-fn setup_ui(mut commands: Commands) {
+fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(5.1, 0.1, 2.).looking_at(Vec3::ZERO, Vec3::Y),
         RenderCamera,
-    ));
-    commands.spawn((
-        UiFpsText,
-        Text::new(""),
-        TextFont {
-            font_size: 20.0,
-            ..default()
-        },
-        TextColor(WHITE.into()),
-        Node {
-            align_self: AlignSelf::Start,
-            justify_self: JustifySelf::Start,
-            ..default()
-        },
     ));
 }
 
@@ -131,24 +120,6 @@ fn load_stone_texture_handle(mut commands: Commands, asset_server: Res<AssetServ
 
 #[derive(Resource)]
 struct StoneTextureHandle(Handle<Image>);
-
-fn update_fps_counter(
-    diagnostics: Res<DiagnosticsStore>,
-    mut q_text: Query<&mut Text, With<UiFpsText>>,
-) {
-    if let Some(fps) = diagnostics
-        .get(&FrameTimeDiagnosticsPlugin::FPS)
-        .and_then(|fps| fps.smoothed())
-    {
-        for mut text in &mut q_text {
-            text.0 = format!("FPS: {fps:>3.0}");
-        }
-    } else {
-        for mut text in &mut q_text {
-            text.0 = format!("FPS: N/A");
-        }
-    }
-}
 
 struct MyRenderPlugin;
 
