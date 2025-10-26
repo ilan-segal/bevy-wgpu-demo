@@ -9,7 +9,7 @@ struct Globals {
 @group(0) @binding(0)
 var<uniform> globals: Globals;
 @group(1) @binding(0)
-var my_texture: texture_2d<f32>;
+var my_texture: texture_2d_array<f32>;
 @group(1) @binding(1)
 var my_sampler: sampler;
 
@@ -33,9 +33,10 @@ struct InstanceInput {
 
 struct VertexOutput {
     @builtin(position) clip_pos: vec4<f32>,
-    @location(0) color: vec4<f32>,
-    @location(1) normal: vec3<f32>,
-    @location(2) uv: vec2<f32>,
+    @location(0) material_index: u32,
+    @location(1) color: vec4<f32>,
+    @location(2) normal: vec3<f32>,
+    @location(3) uv: vec2<f32>,
 }
 
 @vertex
@@ -56,6 +57,7 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.color = vec4(in.color, 1.0);
     out.uv = in.uv;
     out.normal = local_normal_to_world * in.normal;
+    out.material_index = instance.texture_index;
     return out;
 }
 
@@ -63,7 +65,12 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let texture_color = textureSample(my_texture, my_sampler, vertex.uv);
+    let texture_color = textureSample(
+        my_texture,
+        my_sampler,
+        vertex.uv,
+        vertex.material_index
+    );
     let light = (
         globals.ambient_light 
         + (

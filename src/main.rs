@@ -1,4 +1,4 @@
-use std::{ops::Deref, time::Instant};
+use std::{num::NonZero, ops::Deref, time::Instant};
 
 use bevy::{
     core_pipeline::core_3d::graph::{Core3d, Node3d},
@@ -16,13 +16,14 @@ use bevy::{
             BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor,
             BufferInitDescriptor, BufferUsages, ColorTargetState, ColorWrites, CompareFunction,
             DepthBiasState, DepthStencilState, Extent3d, Face, FilterMode, IndexFormat, LoadOp,
-            Operations, PipelineLayoutDescriptor, PrimitiveState, RawFragmentState,
+            Operations, Origin3d, PipelineLayoutDescriptor, PrimitiveState, RawFragmentState,
             RawRenderPipelineDescriptor, RawVertexBufferLayout, RawVertexState,
             RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor,
             RenderPipeline, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor,
-            ShaderSource, ShaderStages, StencilState, StoreOp, TextureDescriptor, TextureFormat,
-            TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor,
-            TextureViewDimension, VertexStepMode,
+            ShaderSource, ShaderStages, StencilState, StoreOp, TexelCopyBufferInfo,
+            TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDescriptor,
+            TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
+            TextureViewDescriptor, TextureViewDimension, VertexStepMode,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         texture::GpuImage,
@@ -218,6 +219,7 @@ struct MyRenderNodeLabel;
 
 #[derive(Resource)]
 struct TextureBindGroup {
+    texture_view: TextureView,
     bind_group: BindGroup,
     layout: BindGroupLayout,
 }
@@ -225,14 +227,69 @@ struct TextureBindGroup {
 fn prepare_texture_bind_group(
     mut commands: Commands,
     gpu_images: Res<RenderAssets<GpuImage>>,
-    texture_handle: Extract<Res<StoneTextureHandle>>,
+    texture_handles: Extract<Res<TerrainColorTextureHandles>>,
     render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    image_assets: Extract<Res<Assets<Image>>>,
 ) {
-    let Some(image) = gpu_images.get(&texture_handle.0) else {
-        info!("Waiting to load GPU image");
+    let image_layers = texture_handles
+        .handles
+        .iter()
+        .flat_map(|handle| gpu_images.get(handle))
+        .collect::<Vec<_>>();
+    if image_layers.len() != texture_handles.handles.len() {
         return;
+    }
+    info!("Loaded GPU images. Creating texture array.");
+
+    let layer_count = image_layers.len() as u32;
+    let extent = Extent3d {
+        depth_or_array_layers: layer_count,
+        ..image_layers[0].size
     };
-    info!("Loaded GPU image");
+    let array_texture = render_device.create_texture(&TextureDescriptor {
+        label: Some("terrain_color_texture_array"),
+        size: extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: TextureDimension::D2,
+        format: image_layers[0].texture_format,
+        usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+
+    for (i, img) in image_layers.iter().enumerate() {
+        let data = image_assets
+            .get(texture_handles.handles[i].id())
+            .cloned()
+            .expect("Texture should exist in CPU land")
+            .data;
+        let data = data.unwrap().clone();
+        let data = data.as_slice();
+        render_queue.write_texture(
+            TexelCopyTextureInfo {
+                texture: &array_texture,
+                mip_level: 0,
+                origin: Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: i as _,
+                },
+                aspect: TextureAspect::All,
+            },
+            data,
+            TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(img.size.width * 4),
+                rows_per_image: None,
+            },
+            Extent3d {
+                depth_or_array_layers: 1,
+                ..img.size
+            },
+        );
+    }
+
     let layout = render_device.create_bind_group_layout(
         Some("my texture bind group layout"),
         &[
@@ -242,7 +299,7 @@ fn prepare_texture_bind_group(
                 visibility: ShaderStages::FRAGMENT,
                 ty: BindingType::Texture {
                     sample_type: TextureSampleType::Float { filterable: true },
-                    view_dimension: TextureViewDimension::D2,
+                    view_dimension: TextureViewDimension::D2Array,
                     multisampled: false,
                 },
                 count: None,
@@ -266,13 +323,20 @@ fn prepare_texture_bind_group(
         address_mode_w: AddressMode::ClampToEdge,
         ..Default::default()
     });
+
+    // Create view, sampler, and bind group
+    let texture_view = array_texture.create_view(&TextureViewDescriptor {
+        dimension: Some(TextureViewDimension::D2Array),
+        ..Default::default()
+    });
+
     let bind_group = render_device.create_bind_group(
         Some("My texture bind group"),
         &layout,
         &[
             BindGroupEntry {
                 binding: 0,
-                resource: BindingResource::TextureView(&image.texture_view),
+                resource: BindingResource::TextureView(&texture_view),
             },
             BindGroupEntry {
                 binding: 1,
@@ -281,7 +345,11 @@ fn prepare_texture_bind_group(
         ],
     );
 
-    commands.insert_resource(TextureBindGroup { bind_group, layout });
+    commands.insert_resource(TextureBindGroup {
+        bind_group,
+        layout,
+        texture_view,
+    });
 }
 
 #[derive(Resource)]
