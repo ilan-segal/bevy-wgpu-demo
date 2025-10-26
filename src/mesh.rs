@@ -14,7 +14,11 @@ pub struct WorldMeshPlugin;
 
 impl Plugin for WorldMeshPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, assign_quads);
+        app.init_resource::<QuadCount>()
+            .add_systems(Update, assign_quads)
+            .add_observer(update_quad_count_for_despawn)
+            .add_observer(update_quad_count_for_replace)
+            .add_observer(update_quad_count_for_insert);
     }
 }
 
@@ -27,6 +31,45 @@ pub struct Quad {
     pub width: NonZero<u32>,
     pub height: NonZero<u32>,
     pub pos: IVec3,
+}
+
+#[derive(Resource, Default)]
+pub struct QuadCount(pub u32);
+
+fn update_quad_count_for_despawn(
+    trigger: Trigger<OnRemove, Quads>,
+    mut count: ResMut<QuadCount>,
+    q_quads: Query<&Quads>,
+) {
+    let entity = trigger.target();
+    let Ok(quads) = q_quads.get(entity) else {
+        return;
+    };
+    count.0 -= quads.0.len() as u32;
+}
+
+fn update_quad_count_for_replace(
+    trigger: Trigger<OnReplace, Quads>,
+    mut count: ResMut<QuadCount>,
+    q_quads: Query<&Quads>,
+) {
+    let entity = trigger.target();
+    let Ok(quads) = q_quads.get(entity) else {
+        return;
+    };
+    count.0 -= quads.0.len() as u32;
+}
+
+fn update_quad_count_for_insert(
+    trigger: Trigger<OnInsert, Quads>,
+    mut count: ResMut<QuadCount>,
+    q_quads: Query<&Quads>,
+) {
+    let entity = trigger.target();
+    let Ok(quads) = q_quads.get(entity) else {
+        return;
+    };
+    count.0 += quads.0.len() as u32;
 }
 
 #[derive(Resource)]
