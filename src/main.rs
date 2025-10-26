@@ -3,6 +3,7 @@ use std::{ops::Deref, time::Instant};
 use bevy::{
     core_pipeline::core_3d::graph::{Core3d, Node3d},
     ecs::query::{QueryData, QuerySingleError},
+    platform::collections::HashMap,
     prelude::*,
     render::{
         Extract, RenderApp,
@@ -140,10 +141,13 @@ struct MyRenderPlugin;
 impl Plugin for MyRenderPlugin {
     fn build(&self, app: &mut App) {
         let render_app = app
+            .add_observer(emit_chunk_despawn_event)
+            .add_event::<ChunkDespawn>()
             .sub_app_mut(RenderApp)
             .init_resource::<StartupTime>()
             .init_resource::<CameraProjectionMatrix>()
             .init_resource::<PipelineIsNotInitialized>()
+            .init_resource::<InstanceBuffers>()
             .add_systems(
                 ExtractSchedule,
                 (
@@ -156,7 +160,7 @@ impl Plugin for MyRenderPlugin {
                         .chain()
                         .run_if(resource_exists::<PipelineIsNotInitialized>),
                     update_camera_projection_matrix,
-                    update_instance_buffer,
+                    (remove_buffer_for_despawned_chunk, update_instance_buffer).chain(),
                     resize_depth_texture,
                     extract_resource_to_render_world::<AmbientLight>,
                     extract_resource_to_render_world::<DirectionalLight>,
@@ -553,37 +557,67 @@ fn update_camera_projection_matrix(
     matrix.0 = projection_matrix;
 }
 
-#[derive(Resource)]
-pub struct InstanceBuffer {
+struct InstanceBuffer {
     buffer: Buffer,
     num_instances: u32,
 }
 
-fn update_instance_buffer(
-    mut commands: Commands,
-    render_device: Res<RenderDevice>,
-    q_quads: Extract<Query<(&Quads, &ChunkPosition), Changed<Quads>>>,
+#[derive(Resource, Default)]
+struct InstanceBuffers {
+    chunk_pos_to_buffer: HashMap<IVec3, InstanceBuffer>,
+}
+
+#[derive(Event)]
+struct ChunkDespawn(ChunkPosition);
+
+fn emit_chunk_despawn_event(
+    trigger: Trigger<OnRemove, ChunkPosition>,
+    q_chunk_position: Query<&ChunkPosition>,
+    mut ew: EventWriter<ChunkDespawn>,
 ) {
-    let Ok((quads, chunk_position)) = q_quads.single() else {
+    let entity = trigger.target();
+    let Ok(pos) = q_chunk_position.get(entity) else {
         return;
     };
-    let instances_raw = quads
-        .0
-        .iter()
-        .map(|quad| create_instance(quad, chunk_position))
-        .map(DetailedInstanceRaw::from)
-        .collect::<Vec<_>>();
-    let num_instances = instances_raw.len() as u32;
-    info!("{} instances", num_instances);
-    let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-        label: Some("Instance buffer"),
-        contents: bytemuck::cast_slice(instances_raw.as_slice()),
-        usage: BufferUsages::VERTEX,
-    });
-    commands.insert_resource(InstanceBuffer {
-        buffer,
-        num_instances,
-    });
+    ew.write(ChunkDespawn(*pos));
+}
+
+fn remove_buffer_for_despawned_chunk(
+    mut er: Extract<EventReader<ChunkDespawn>>,
+    mut instance_buffers: ResMut<InstanceBuffers>,
+) {
+    for ChunkDespawn(ChunkPosition(pos)) in er.read() {
+        instance_buffers.chunk_pos_to_buffer.remove(pos);
+    }
+}
+
+fn update_instance_buffer(
+    render_device: Res<RenderDevice>,
+    mut instance_buffers: ResMut<InstanceBuffers>,
+    q_quads: Extract<Query<(&Quads, &ChunkPosition), Changed<Quads>>>,
+) {
+    for (quads, chunk_position) in q_quads.iter() {
+        let instances_raw = quads
+            .0
+            .iter()
+            .map(|quad| create_instance(quad, chunk_position))
+            .map(DetailedInstanceRaw::from)
+            .collect::<Vec<_>>();
+        let num_instances = instances_raw.len() as u32;
+        info!("{} instances", num_instances);
+        let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: Some("Instance buffer"),
+            contents: bytemuck::cast_slice(instances_raw.as_slice()),
+            usage: BufferUsages::VERTEX,
+        });
+        let item = InstanceBuffer {
+            buffer,
+            num_instances,
+        };
+        instance_buffers
+            .chunk_pos_to_buffer
+            .insert(chunk_position.0, item);
+    }
 }
 
 fn create_instance(quad: &Quad, chunk_position: &ChunkPosition) -> DetailedInstance {
@@ -696,15 +730,30 @@ impl ViewNode for MyRenderNode {
             pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
             pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
 
-            if let Some(InstanceBuffer {
+            // if let Some(InstanceBuffer {
+            //     buffer: instance_buffer,
+            //     num_instances,
+            // }) = world.get_resource::<InstanceBuffer>()
+            // {
+            //     if num_instances > &0 {
+            //         pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
+            //         pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
+            //     }
+            // }
+
+            for InstanceBuffer {
                 buffer: instance_buffer,
                 num_instances,
-            }) = world.get_resource::<InstanceBuffer>()
+            } in world
+                .resource::<InstanceBuffers>()
+                .chunk_pos_to_buffer
+                .values()
             {
-                if num_instances > &0 {
-                    pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
-                    pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
+                if num_instances == &0 {
+                    continue;
                 }
+                pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
+                pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
             }
         }
 
