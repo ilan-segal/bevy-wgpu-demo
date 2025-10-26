@@ -280,12 +280,6 @@ pub struct IndexBuffer {
 }
 
 #[derive(Resource)]
-pub struct InstanceBuffer {
-    buffer: Buffer,
-    num_instances: u32,
-}
-
-#[derive(Resource)]
 pub struct DepthTexture {
     view: TextureView,
     format: TextureFormat,
@@ -383,17 +377,17 @@ fn init_pipeline(
     //     })
     //     .map(DetailedInstanceRaw::from)
     //     .collect::<Vec<_>>();
-    let instances_raw = Vec::<DetailedInstanceRaw>::new();
-    info!("{} instances to load.", instances_raw.len());
-    let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-        label: Some("Instance buffer"),
-        contents: bytemuck::cast_slice(instances_raw.as_slice()),
-        usage: BufferUsages::VERTEX,
-    });
-    commands.insert_resource(InstanceBuffer {
-        buffer: instance_buffer,
-        num_instances: instances_raw.len() as u32,
-    });
+    // let instances_raw = Vec::<DetailedInstanceRaw>::new();
+    // info!("{} instances to load.", instances_raw.len());
+    // let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+    //     label: Some("Instance buffer"),
+    //     contents: bytemuck::cast_slice(instances_raw.as_slice()),
+    //     usage: BufferUsages::VERTEX,
+    // });
+    // commands.insert_resource(InstanceBuffer {
+    //     buffer: instance_buffer,
+    //     num_instances: instances_raw.len() as u32,
+    // });
 
     let index_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
         label: Some("Index buffer"),
@@ -559,6 +553,12 @@ fn update_camera_projection_matrix(
     matrix.0 = projection_matrix;
 }
 
+#[derive(Resource)]
+pub struct InstanceBuffer {
+    buffer: Buffer,
+    num_instances: u32,
+}
+
 fn update_instance_buffer(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
@@ -647,10 +647,6 @@ impl ViewNode for MyRenderNode {
             buffer: index_buffer,
             num_indices,
         } = world.resource::<IndexBuffer>();
-        let InstanceBuffer {
-            buffer: instance_buffer,
-            num_instances,
-        } = world.resource::<InstanceBuffer>();
         let depth = world.resource::<DepthTexture>();
 
         let Some(mut query) =
@@ -699,9 +695,16 @@ impl ViewNode for MyRenderNode {
             pass.set_bind_group(1, texture_bind_group, &[]);
             pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
             pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
-            if num_instances > &0 {
-                pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
-                pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
+
+            if let Some(InstanceBuffer {
+                buffer: instance_buffer,
+                num_instances,
+            }) = world.get_resource::<InstanceBuffer>()
+            {
+                if num_instances > &0 {
+                    pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
+                    pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
+                }
             }
         }
 
