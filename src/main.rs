@@ -72,7 +72,7 @@ fn main() {
         .insert_resource(AmbientLight(Color::srgb(0.1, 0.1, 0.1)))
         .insert_resource(DirectionalLight {
             color: Color::srgb(0.75, 0.75, 0.75),
-            direction: Dir3::new(Vec3::new(0.75, -1.0, 2.5))
+            direction: Dir3::new(Vec3::new(0.75, -6.0, 2.5))
                 .expect("Non-zero light direction vector"),
         })
         .add_systems(
@@ -121,16 +121,17 @@ struct DirectionalLight {
     direction: Dir3,
 }
 
-fn extract_lights(
+fn extract_resource_to_render_world<T: Resource + Clone>(
     mut commands: Commands,
-    ambient: Extract<Option<Res<AmbientLight>>>,
-    directional: Extract<Option<Res<DirectionalLight>>>,
+    resource: Extract<Option<Res<T>>>,
 ) {
-    if let Some(color) = ambient.deref() {
-        commands.insert_resource(color.deref().clone());
-    }
-    if let Some(color) = directional.deref() {
-        commands.insert_resource(color.deref().clone());
+    match resource.deref() {
+        Some(value) => {
+            commands.insert_resource(value.deref().clone());
+        }
+        None => {
+            commands.remove_resource::<T>();
+        }
     }
 }
 
@@ -157,7 +158,8 @@ impl Plugin for MyRenderPlugin {
                     update_camera_projection_matrix,
                     update_instance_buffer,
                     resize_depth_texture,
-                    extract_lights,
+                    extract_resource_to_render_world::<AmbientLight>,
+                    extract_resource_to_render_world::<DirectionalLight>,
                 ),
             );
 
