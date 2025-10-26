@@ -69,6 +69,12 @@ fn main() {
             WorldMeshPlugin,
         ))
         .insert_resource(MeshingType::Naive)
+        .insert_resource(AmbientLight(Color::srgb(0.1, 0.1, 0.1)))
+        .insert_resource(DirectionalLight {
+            color: Color::srgb(0.75, 0.75, 0.75),
+            direction: Dir3::new(Vec3::new(0.75, -1.0, 2.5))
+                .expect("Non-zero light direction vector"),
+        })
         .add_systems(
             Startup,
             (spawn_camera, load_stone_texture_handle, capture_mouse),
@@ -106,6 +112,28 @@ fn load_stone_texture_handle(mut commands: Commands, asset_server: Res<AssetServ
 #[derive(Resource)]
 struct StoneTextureHandle(Handle<Image>);
 
+#[derive(Resource, Clone, Copy)]
+struct AmbientLight(Color);
+
+#[derive(Resource, Clone, Copy)]
+struct DirectionalLight {
+    color: Color,
+    direction: Dir3,
+}
+
+fn extract_lights(
+    mut commands: Commands,
+    ambient: Extract<Option<Res<AmbientLight>>>,
+    directional: Extract<Option<Res<DirectionalLight>>>,
+) {
+    if let Some(color) = ambient.deref() {
+        commands.insert_resource(color.deref().clone());
+    }
+    if let Some(color) = directional.deref() {
+        commands.insert_resource(color.deref().clone());
+    }
+}
+
 struct MyRenderPlugin;
 
 impl Plugin for MyRenderPlugin {
@@ -129,6 +157,7 @@ impl Plugin for MyRenderPlugin {
                     update_camera_projection_matrix,
                     update_instance_buffer,
                     resize_depth_texture,
+                    extract_lights,
                 ),
             );
 
@@ -587,7 +616,13 @@ impl ViewNode for MyRenderNode {
         let mut globals = Globals::default();
         globals.elapsed_seconds = elapsed_seconds;
         globals.projection_matrix = projection_matrix;
-        globals.ambient_light = [0.1; 3];
+        if let Some(AmbientLight(colour)) = world.get_resource::<AmbientLight>() {
+            globals.ambient_light = colour.to_srgba().to_f32_array_no_alpha();
+        }
+        if let Some(directional_light) = world.get_resource::<DirectionalLight>() {
+            globals.directional_light = directional_light.color.to_srgba().to_f32_array_no_alpha();
+            globals.directional_light_direction = directional_light.direction.to_array();
+        }
         // info!("{:?}", camera_transform.compute_matrix());
         let render_queue = world.resource::<RenderQueue>();
         let buffer = world.resource::<GlobalsUniformBuffer>();

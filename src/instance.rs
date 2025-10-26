@@ -103,22 +103,22 @@ impl DetailedInstanceRaw {
             VertexAttribute {
                 format: VertexFormat::Float32x4,
                 offset: 0,
-                shader_location: 3,
-            },
-            VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: std::mem::size_of::<[f32; 4]>() as _,
                 shader_location: 4,
             },
             VertexAttribute {
                 format: VertexFormat::Float32x4,
-                offset: std::mem::size_of::<[f32; 8]>() as _,
+                offset: std::mem::size_of::<[f32; 4]>() as _,
                 shader_location: 5,
             },
             VertexAttribute {
                 format: VertexFormat::Float32x4,
-                offset: std::mem::size_of::<[f32; 12]>() as _,
+                offset: std::mem::size_of::<[f32; 8]>() as _,
                 shader_location: 6,
+            },
+            VertexAttribute {
+                format: VertexFormat::Float32x4,
+                offset: std::mem::size_of::<[f32; 12]>() as _,
+                shader_location: 7,
             },
         ]
     }
