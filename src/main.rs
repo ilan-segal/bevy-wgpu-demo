@@ -604,7 +604,6 @@ fn update_instance_buffer(
             .map(DetailedInstanceRaw::from)
             .collect::<Vec<_>>();
         let num_instances = instances_raw.len() as u32;
-        info!("{} instances", num_instances);
         let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             label: Some("Instance buffer"),
             contents: bytemuck::cast_slice(instances_raw.as_slice()),
@@ -621,14 +620,11 @@ fn update_instance_buffer(
 }
 
 fn create_instance(quad: &Quad, chunk_position: &ChunkPosition) -> DetailedInstance {
-    let translation = quad.pos.as_vec3() + 32.0 * chunk_position.0.as_vec3();
-    let rotation = Transform::IDENTITY
-        .looking_to(quad.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y)
-        .rotation;
-    DetailedInstance {
-        translation,
-        rotation,
-    }
+    let transform =
+        Transform::from_translation(quad.pos.as_vec3() + 32.0 * chunk_position.0.as_vec3())
+            .with_scale(Vec3::new(quad.width.get() as _, quad.height.get() as _, 1.))
+            .looking_to(quad.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y);
+    DetailedInstance { transform }
 }
 
 #[derive(Default)]

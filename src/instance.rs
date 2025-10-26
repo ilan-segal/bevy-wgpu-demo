@@ -79,8 +79,7 @@ impl From<Instance> for InstanceRaw {
 }
 
 pub struct DetailedInstance {
-    pub translation: Vec3,
-    pub rotation: Quat,
+    pub transform: bevy::prelude::Transform,
 }
 
 #[repr(C)]
@@ -91,8 +90,7 @@ pub struct DetailedInstanceRaw {
 
 impl From<DetailedInstance> for DetailedInstanceRaw {
     fn from(value: DetailedInstance) -> Self {
-        let matrix = Mat4::from_translation(value.translation) * Mat4::from_quat(value.rotation);
-        let matrix_cols = matrix.to_cols_array_2d();
+        let matrix_cols = value.transform.compute_matrix().to_cols_array_2d();
         Self { matrix_cols }
     }
 }
