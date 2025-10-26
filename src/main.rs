@@ -30,7 +30,7 @@ use bevy::{
     ui::graph::NodeUi,
     window::{CursorGrabMode, PresentMode, PrimaryWindow, WindowResized},
 };
-use lib_chunk::ChunkIndexPlugin;
+use lib_chunk::{ChunkIndexPlugin, ChunkPosition};
 use lib_first_person_camera::FirstPersonCameraPlugin;
 
 use crate::{
@@ -562,15 +562,15 @@ fn update_camera_projection_matrix(
 fn update_instance_buffer(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
-    q_quads: Extract<Query<&Quads, Changed<Quads>>>,
+    q_quads: Extract<Query<(&Quads, &ChunkPosition), Changed<Quads>>>,
 ) {
-    let Ok(quads) = q_quads.single() else {
+    let Ok((quads, chunk_position)) = q_quads.single() else {
         return;
     };
     let instances_raw = quads
         .0
         .iter()
-        .map(instance_from_quad)
+        .map(|quad| create_instance(quad, chunk_position))
         .map(DetailedInstanceRaw::from)
         .collect::<Vec<_>>();
     let num_instances = instances_raw.len() as u32;
@@ -586,8 +586,8 @@ fn update_instance_buffer(
     });
 }
 
-fn instance_from_quad(quad: &Quad) -> DetailedInstance {
-    let translation = quad.pos.as_vec3();
+fn create_instance(quad: &Quad, chunk_position: &ChunkPosition) -> DetailedInstance {
+    let translation = quad.pos.as_vec3() + 32.0 * chunk_position.0.as_vec3();
     let rotation = Transform::IDENTITY
         .looking_to(quad.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y)
         .rotation;
