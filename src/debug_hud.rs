@@ -79,7 +79,7 @@ impl PerfUiEntry for PerfUiEntryCameraPosition {
     type SystemParam = SQuery<&'static GlobalTransform, With<Camera3d>>;
 
     fn label(&self) -> &str {
-        "Camera Forward"
+        "Camera Position"
     }
 
     fn sort_key(&self) -> i32 {
