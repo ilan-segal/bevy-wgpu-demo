@@ -106,7 +106,7 @@ fn spawn_camera(mut commands: Commands) {
 }
 
 fn load_stone_texture_handle(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let handle = asset_server.load("smooth_stone.png");
+    let handle = asset_server.load("stone.png");
     commands.insert_resource(StoneTextureHandle(handle));
 }
 
