@@ -33,8 +33,10 @@ use bevy::{
 };
 use lib_chunk::{ChunkIndexPlugin, ChunkPosition};
 use lib_first_person_camera::FirstPersonCameraPlugin;
+use strum::IntoEnumIterator;
 
 use crate::{
+    block::Block,
     debug_hud::DebugHudPlugin,
     globals::Globals,
     instance::{DetailedInstance, DetailedInstanceRaw},
@@ -78,7 +80,12 @@ fn main() {
         })
         .add_systems(
             Startup,
-            (spawn_camera, load_stone_texture_handle, capture_mouse),
+            (
+                spawn_camera,
+                load_stone_texture_handle,
+                load_terrain_textures,
+                capture_mouse,
+            ),
         )
         .run();
 }
@@ -112,6 +119,25 @@ fn load_stone_texture_handle(mut commands: Commands, asset_server: Res<AssetServ
 
 #[derive(Resource)]
 struct StoneTextureHandle(Handle<Image>);
+
+#[derive(Resource)]
+struct TerrainColorTextureHandles {
+    handles: Vec<Handle<Image>>,
+}
+
+fn load_terrain_textures(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let mut texture_index_values = Block::iter()
+        .filter_map(|block| block.get_texture_index())
+        .collect::<Vec<_>>();
+    texture_index_values.sort_by_key(|t| t.index);
+    let handles = texture_index_values
+        .iter()
+        .map(|t| t.asset_path)
+        .map(|path| asset_server.load(path))
+        .collect();
+    let resource = TerrainColorTextureHandles { handles };
+    commands.insert_resource(resource);
+}
 
 #[derive(Resource, Clone, Copy)]
 struct AmbientLight(Color);
@@ -189,10 +215,6 @@ struct PipelineIsNotInitialized;
 
 #[derive(RenderLabel, Hash, Clone, Debug, PartialEq, Eq)]
 struct MyRenderNodeLabel;
-
-// fn extract_stone_texture_handle(mut commands: Commands, handle: Extract<Res<StoneTextureHandle>>) {
-//     commands.insert_resource(StoneTextureHandle(handle.0.clone_weak()));
-// }
 
 #[derive(Resource)]
 struct TextureBindGroup {
@@ -362,36 +384,6 @@ fn init_pipeline(
         step_mode: VertexStepMode::Instance,
         attributes: &DetailedInstanceRaw::desc(),
     };
-    // const INSTANCES_PER_ROW: u32 = 1000;
-    // const INSTANCES_ROWS: u32 = 1000;
-    // const SPACING: f32 = 1.1;
-    // let instances_raw = (0..INSTANCES_PER_ROW * INSTANCES_ROWS)
-    //     .map(|i| (i % INSTANCES_PER_ROW, i / INSTANCES_PER_ROW))
-    //     .map(|(x, z)| {
-    //         let x = x as f32;
-    //         let z = z as f32;
-    //         let translation = Vec3::new(-x * SPACING, 0.0, -z * SPACING);
-    //         let rotation = Quat::from_rotation_y(TAU * 0.04 * ((x * 0.5).sin() + 1.0))
-    //             * Quat::from_rotation_z(TAU * 0.1 * (((x + z) * 0.5).sin() + 1.0))
-    //             * Quat::from_rotation_x(TAU * 0.05 * (((x + z) * 0.5).sin() + 1.0));
-    //         DetailedInstance {
-    //             translation,
-    //             rotation,
-    //         }
-    //     })
-    //     .map(DetailedInstanceRaw::from)
-    //     .collect::<Vec<_>>();
-    // let instances_raw = Vec::<DetailedInstanceRaw>::new();
-    // info!("{} instances to load.", instances_raw.len());
-    // let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-    //     label: Some("Instance buffer"),
-    //     contents: bytemuck::cast_slice(instances_raw.as_slice()),
-    //     usage: BufferUsages::VERTEX,
-    // });
-    // commands.insert_resource(InstanceBuffer {
-    //     buffer: instance_buffer,
-    //     num_instances: instances_raw.len() as u32,
-    // });
 
     let index_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
         label: Some("Index buffer"),
@@ -624,7 +616,14 @@ fn create_instance(quad: &Quad, chunk_position: &ChunkPosition) -> DetailedInsta
         Transform::from_translation(quad.pos.as_vec3() + 32.0 * chunk_position.0.as_vec3())
             .with_scale(Vec3::new(quad.width.get() as _, quad.height.get() as _, 1.))
             .looking_to(quad.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y);
-    DetailedInstance { transform }
+    DetailedInstance {
+        transform,
+        texture_index: quad
+            .block
+            .get_texture_index()
+            .expect("quad should have texture-able block")
+            .index,
+    }
 }
 
 #[derive(Default)]

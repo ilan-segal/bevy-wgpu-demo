@@ -1,84 +1,48 @@
-use crate::normal::Normal;
-use bevy::{
-    math::{Mat4, Quat, UVec2, UVec3, Vec3},
-    render::{mesh::VertexFormat, render_resource::VertexAttribute},
-};
+use bevy::render::{mesh::VertexFormat, render_resource::VertexAttribute};
 
-pub struct Instance {
-    pub position: UVec3,
-    pub dimensions: UVec2,
-    pub normal: Normal,
-}
+// pub struct Instance {
+//     pub position: UVec3,
+//     pub dimensions: UVec2,
+//     pub normal: Normal,
+// }
 
-// pub const CUBE_FACE_INSTANCES: &[Instance; 6] = &[
-//     Instance {
-//         position: UVec3::ZERO,
-//         dimensions: UVec2::ONE,
-//         normal: Normal::PosX,
-//     },
-//     Instance {
-//         position: UVec3::ZERO,
-//         dimensions: UVec2::ONE,
-//         normal: Normal::NegX,
-//     },
-//     Instance {
-//         position: UVec3::ZERO,
-//         dimensions: UVec2::ONE,
-//         normal: Normal::PosY,
-//     },
-//     Instance {
-//         position: UVec3::ZERO,
-//         dimensions: UVec2::ONE,
-//         normal: Normal::NegY,
-//     },
-//     Instance {
-//         position: UVec3::ZERO,
-//         dimensions: UVec2::ONE,
-//         normal: Normal::PosZ,
-//     },
-//     Instance {
-//         position: UVec3::ZERO,
-//         dimensions: UVec2::ONE,
-//         normal: Normal::NegZ,
-//     },
-// ];
+// /**
+// All block face data in four bytes:
 
-/**
-All block face data in four bytes:
+// - 0-4: Width (0-31, needs 5 bits)
+// - 5-9: Height (0-31, needs 5 bits)
+// - 10-14: X (in chunk) (0-31, needs 5 bits)
+// - 15-19: Y (in chunk) (0-31, needs 5 bits)
+// - 20-24: Z (in chunk) (0-31, needs 5 bits)
+// - 25-27: Normal ID (0-5, needs 3 bits)
+// - 28-29: Ambient occlusion factor (0-3, needs 2 bits)
+// - 30-31: ???
 
-- 0-4: Width (0-31, needs 5 bits)
-- 5-9: Height (0-31, needs 5 bits)
-- 10-14: X (in chunk) (0-31, needs 5 bits)
-- 15-19: Y (in chunk) (0-31, needs 5 bits)
-- 20-24: Z (in chunk) (0-31, needs 5 bits)
-- 25-27: Normal ID (0-5, needs 3 bits)
-- 28-29: Ambient occlusion factor (0-3, needs 2 bits)
-- 30-31: ???
+// Note that the height and width actually have range 1-32, which naively needs
+// 6 bits each, but since the value 0 is not possible, then we can map this onto
+// the range 0-31 and get away with using 5 bits.
+//  */
+// #[repr(C)]
+// #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+// pub struct InstanceRaw {
+//     data: u32,
+// }
 
-Note that the height and width actually have range 1-32, which naively needs
-6 bits each, but since the value 0 is not possible, then we can map this onto
-the range 0-31 and get away with using 5 bits.
- */
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct InstanceRaw {
-    data: u32,
-}
-
-impl From<Instance> for InstanceRaw {
-    fn from(value: Instance) -> Self {
-        let mut data = 0;
-        data |= (value.dimensions.x - 1) << 0;
-        data |= (value.dimensions.y - 1) << 5;
-        data |= value.position.x << 10;
-        data |= value.position.y << 16;
-        data |= value.position.z << 22;
-        data |= (value.normal as u32) << 28;
-        return Self { data };
-    }
-}
+// impl From<Instance> for InstanceRaw {
+//     fn from(value: Instance) -> Self {
+//         let mut data = 0;
+//         data |= (value.dimensions.x - 1) << 0;
+//         data |= (value.dimensions.y - 1) << 5;
+//         data |= value.position.x << 10;
+//         data |= value.position.y << 16;
+//         data |= value.position.z << 22;
+//         data |= (value.normal as u32) << 28;
+//         return Self { data };
+//     }
+// }
 
 pub struct DetailedInstance {
+    pub texture_index: usize,
     pub transform: bevy::prelude::Transform,
 }
 
@@ -86,17 +50,21 @@ pub struct DetailedInstance {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DetailedInstanceRaw {
     matrix_cols: [[f32; 4]; 4],
+    texture_index: usize,
 }
 
 impl From<DetailedInstance> for DetailedInstanceRaw {
     fn from(value: DetailedInstance) -> Self {
         let matrix_cols = value.transform.compute_matrix().to_cols_array_2d();
-        Self { matrix_cols }
+        Self {
+            matrix_cols,
+            texture_index: value.texture_index,
+        }
     }
 }
 
 impl DetailedInstanceRaw {
-    pub fn desc() -> [VertexAttribute; 4] {
+    pub fn desc() -> [VertexAttribute; 5] {
         [
             VertexAttribute {
                 format: VertexFormat::Float32x4,
@@ -117,6 +85,11 @@ impl DetailedInstanceRaw {
                 format: VertexFormat::Float32x4,
                 offset: std::mem::size_of::<[f32; 12]>() as _,
                 shader_location: 7,
+            },
+            VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: std::mem::size_of::<[f32; 16]>() as _,
+                shader_location: 8,
             },
         ]
     }

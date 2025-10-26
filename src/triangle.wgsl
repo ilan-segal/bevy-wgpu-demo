@@ -28,6 +28,7 @@ struct InstanceInput {
     @location(5) model_matrix_1: vec4<f32>,
     @location(6) model_matrix_2: vec4<f32>,
     @location(7) model_matrix_3: vec4<f32>,
+    @location(8) texture_index: u32,
 };
 
 struct VertexOutput {

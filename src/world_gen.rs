@@ -43,7 +43,7 @@ struct HeightNoiseGenerator(FractalNoise);
 fn init_height_noise_generator(mut commands: Commands, world_seed: Res<WorldSeed>) {
     let seed = world_seed.0;
     let num_layers = 6;
-    let scale = 0.05;
+    let scale = 0.02;
     let noise = FractalNoise::new(seed, NonZero::new(num_layers).unwrap(), scale);
     let generator = HeightNoiseGenerator(noise);
     commands.insert_resource(generator);
@@ -98,8 +98,10 @@ fn assign_blocks(
             .map(|(x, y, z)| {
                 let height_sample = *item.height_noise.at_pos([x, z]);
                 let true_y = (y as i32 + chunk_y) as f64;
-                if true_y < height_sample * WORLD_AMPLITUDE {
+                if true_y + 1. < height_sample * WORLD_AMPLITUDE {
                     Block::Stone
+                } else if true_y < height_sample * WORLD_AMPLITUDE {
+                    Block::Dirt
                 } else {
                     Block::Air
                 }
