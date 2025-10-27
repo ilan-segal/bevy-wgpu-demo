@@ -1,4 +1,4 @@
-use std::{num::NonZero, ops::Deref, time::Instant};
+use std::{ops::Deref, time::Instant};
 
 use bevy::{
     core_pipeline::core_3d::graph::{Core3d, Node3d},
@@ -20,10 +20,10 @@ use bevy::{
             RawRenderPipelineDescriptor, RawVertexBufferLayout, RawVertexState,
             RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor,
             RenderPipeline, SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor,
-            ShaderSource, ShaderStages, StencilState, StoreOp, TexelCopyBufferInfo,
-            TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDescriptor,
-            TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
-            TextureViewDescriptor, TextureViewDimension, VertexStepMode,
+            ShaderSource, ShaderStages, StencilState, StoreOp, TexelCopyBufferLayout,
+            TexelCopyTextureInfo, TextureAspect, TextureDescriptor, TextureDimension,
+            TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor,
+            TextureViewDimension, VertexStepMode,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         texture::GpuImage,
@@ -81,12 +81,7 @@ fn main() {
         })
         .add_systems(
             Startup,
-            (
-                spawn_camera,
-                load_stone_texture_handle,
-                load_terrain_textures,
-                capture_mouse,
-            ),
+            (spawn_camera, load_terrain_textures, capture_mouse),
         )
         .run();
 }
@@ -112,14 +107,6 @@ fn spawn_camera(mut commands: Commands) {
         RenderCamera,
     ));
 }
-
-fn load_stone_texture_handle(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let handle = asset_server.load("stone.png");
-    commands.insert_resource(StoneTextureHandle(handle));
-}
-
-#[derive(Resource)]
-struct StoneTextureHandle(Handle<Image>);
 
 #[derive(Resource)]
 struct TerrainColorTextureHandles {
@@ -219,7 +206,6 @@ struct MyRenderNodeLabel;
 
 #[derive(Resource)]
 struct TextureBindGroup {
-    texture_view: TextureView,
     bind_group: BindGroup,
     layout: BindGroupLayout,
 }
@@ -345,11 +331,7 @@ fn prepare_texture_bind_group(
         ],
     );
 
-    commands.insert_resource(TextureBindGroup {
-        bind_group,
-        layout,
-        texture_view,
-    });
+    commands.insert_resource(TextureBindGroup { bind_group, layout });
 }
 
 #[derive(Resource)]
