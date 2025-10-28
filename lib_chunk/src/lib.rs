@@ -109,6 +109,8 @@ impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
                         consume_neighbor_update_events::<T>,
                     )
                         .chain(),
+                    assign_full_neighborhood::<T>,
+                    revoke_full_neighborhood::<T>,
                 ),
             )
             .add_observer(notify_neighbors_on_delete::<T>);
@@ -296,5 +298,83 @@ fn consume_neighbor_update_events<T: Component + Clone>(
             let neighborhood_chunk_pos = flipped_offset.to_array();
             neighborhood.put_chunk(&neighborhood_chunk_pos, value.clone());
         }
+    }
+}
+
+#[derive(Component)]
+pub struct FullNeighborhood<T> {
+    pub chunks: [Arc<T>; 27],
+}
+
+impl<T> FullNeighborhood<T> {
+    /// pos ∈ {-1, 0, 1}^3
+    pub fn get_chunk(&self, pos: &[i32; 3]) -> &Arc<T> {
+        let [x, y, z] = pos;
+        // Coords of chunk within neighborhood
+        let index = (x + 1) + 3 * (y + 1) + 9 * (z + 1);
+        return &self.chunks[index as usize];
+    }
+
+    pub fn get_middle(&self) -> &Arc<T> {
+        return &self.get_chunk(&[1, 1, 1]);
+    }
+}
+
+impl<T> FullNeighborhood<T>
+where
+    T: SpatiallyMapped<3, Index = usize>,
+{
+    pub fn at_pos(&self, pos: &[i32; 3]) -> &T::Item {
+        const SIZE: i32 = CHUNK_SIZE as i32;
+        let [x, y, z] = pos;
+        /// 0, 1, 2
+        fn get_neighborhood_axis_coord(axis_coord: &i32) -> usize {
+            if *axis_coord < 0 {
+                0
+            } else if axis_coord < &(CHUNK_SIZE as i32) {
+                1
+            } else {
+                2
+            }
+        }
+        // Coords of chunk within neighborhood
+        let xn = get_neighborhood_axis_coord(x);
+        let yn = get_neighborhood_axis_coord(y);
+        let zn = get_neighborhood_axis_coord(z);
+        // Chunk-local coordinates
+        let xl = ((x + SIZE) % SIZE) as usize;
+        let yl = ((y + SIZE) % SIZE) as usize;
+        let zl = ((z + SIZE) % SIZE) as usize;
+        let index = xn + 3 * yn + 9 * zn;
+        return self.chunks[index].at_pos([xl, yl, zl]);
+    }
+}
+
+fn assign_full_neighborhood<T: Component>(
+    mut commands: Commands,
+    q_neighborhood: Query<(Entity, &Neighborhood<T>), Changed<Neighborhood<T>>>,
+) {
+    for (entity, neighborhood) in q_neighborhood.iter() {
+        if neighborhood.chunks.iter().any(Option::is_none) {
+            continue;
+        }
+        let chunks = neighborhood.chunks.clone().map(Option::unwrap);
+        let full_neighborhood = FullNeighborhood { chunks };
+        commands.entity(entity).try_insert(full_neighborhood);
+    }
+}
+
+fn revoke_full_neighborhood<T: Component>(
+    mut commands: Commands,
+    q_neighborhood: Query<
+        (Entity, &Neighborhood<T>),
+        (Changed<Neighborhood<T>>, With<FullNeighborhood<T>>),
+    >,
+) {
+    for (entity, neighborhood) in q_neighborhood.iter() {
+        if neighborhood.chunks.iter().all(Option::is_some) {
+            continue;
+        }
+        commands.entity(entity).try_remove::<FullNeighborhood<T>>();
     }
 }
