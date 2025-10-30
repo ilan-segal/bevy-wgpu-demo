@@ -159,7 +159,7 @@ impl Plugin for MyRenderPlugin {
             .add_event::<ChunkDespawn>()
             .sub_app_mut(RenderApp)
             .init_resource::<StartupTime>()
-            .init_resource::<CameraProjectionMatrix>()
+            .init_resource::<CameraData>()
             .init_resource::<PipelineIsNotInitialized>()
             .init_resource::<InstanceBuffers>()
             .add_systems(
@@ -173,7 +173,7 @@ impl Plugin for MyRenderPlugin {
                     )
                         .chain()
                         .run_if(resource_exists::<PipelineIsNotInitialized>),
-                    update_camera_projection_matrix,
+                    update_camera_data,
                     (remove_buffer_for_despawned_chunk, update_instance_buffer).chain(),
                     resize_depth_texture,
                     extract_resource_to_render_world::<AmbientLight>,
@@ -570,17 +570,14 @@ impl Default for StartupTime {
     }
 }
 
-#[derive(Resource)]
-struct CameraProjectionMatrix(Mat4);
-
-impl Default for CameraProjectionMatrix {
-    fn default() -> Self {
-        Self(Mat4::IDENTITY)
-    }
+#[derive(Resource, Default)]
+struct CameraData {
+    position: Vec3,
+    projection_matrix: Mat4,
 }
 
-fn update_camera_projection_matrix(
-    mut matrix: ResMut<CameraProjectionMatrix>,
+fn update_camera_data(
+    mut camera_data: ResMut<CameraData>,
     camera_query: Extract<Query<(&GlobalTransform, &Projection), With<RenderCamera>>>,
 ) {
     let (camera_transform, projection) = match camera_query.single() {
@@ -596,7 +593,8 @@ fn update_camera_projection_matrix(
     };
     let projection_matrix =
         projection.get_clip_from_view() * camera_transform.compute_matrix().inverse();
-    matrix.0 = projection_matrix;
+    camera_data.projection_matrix = projection_matrix;
+    camera_data.position = camera_transform.translation();
 }
 
 struct InstanceBuffer {
@@ -688,15 +686,16 @@ impl ViewNode for MyRenderNode {
             return;
         }
         // Update globals buffer
-        let projection_matrix = world
-            .resource::<CameraProjectionMatrix>()
-            .0
-            .to_cols_array_2d();
+        let CameraData {
+            projection_matrix,
+            position: camera_position,
+        } = world.resource::<CameraData>();
         let StartupTime(startup_time) = world.resource::<StartupTime>();
         let elapsed_seconds = startup_time.elapsed().as_secs_f32();
         let mut globals = Globals::default();
         globals.elapsed_seconds = elapsed_seconds;
-        globals.projection_matrix = projection_matrix;
+        globals.projection_matrix = projection_matrix.to_cols_array_2d();
+        globals.camera_position = camera_position.to_array();
         if let Some(AmbientLight(colour)) = world.get_resource::<AmbientLight>() {
             globals.ambient_light = colour.to_srgba().to_f32_array_no_alpha();
         }

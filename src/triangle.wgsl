@@ -1,6 +1,7 @@
 struct Globals {
     time_seconds: f32,
     world_to_clip: mat4x4<f32>,
+    camera_position: vec3<f32>,
     ambient_light: vec3<f32>,
     directional_light: vec3<f32>,
     directional_light_direction: vec3<f32>,
@@ -52,8 +53,9 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
         instance.model_matrix_1.xyz,
         instance.model_matrix_2.xyz,
     );
+    let world_pos = local_to_world * vec4(in.position, 1.0);
     var out: VertexOutput;
-    out.clip_pos = globals.world_to_clip * local_to_world * vec4(in.position, 1.0);
+    out.clip_pos = globals.world_to_clip * world_pos;
     out.color = vec4(in.color, 1.0);
     out.uv = in.uv;
     out.normal = local_normal_to_world * in.normal;

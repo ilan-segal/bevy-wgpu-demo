@@ -4,10 +4,12 @@ pub struct Globals {
     pub elapsed_seconds: f32,
     _pad_0: [f32; 3], // pad out to 16 bytes
     pub projection_matrix: [[f32; 4]; 4],
-    pub ambient_light: [f32; 3],
+    pub camera_position: [f32; 3],
     _pad_1: [f32; 1],
-    pub directional_light: [f32; 3],
+    pub ambient_light: [f32; 3],
     _pad_2: [f32; 1],
-    pub directional_light_direction: [f32; 3],
+    pub directional_light: [f32; 3],
     _pad_3: [f32; 1],
+    pub directional_light_direction: [f32; 3],
+    _pad_4: [f32; 1],
 }
