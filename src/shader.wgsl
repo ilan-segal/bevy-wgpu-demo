@@ -1,3 +1,8 @@
+struct FogSettings {
+    color: vec3<f32>,
+    b: f32,
+}
+
 struct Globals {
     time_seconds: f32,
     world_to_clip: mat4x4<f32>,
@@ -5,6 +10,7 @@ struct Globals {
     ambient_light: vec3<f32>,
     directional_light: vec3<f32>,
     directional_light_direction: vec3<f32>,
+    fog: FogSettings,
 }
 
 @group(0) @binding(0)

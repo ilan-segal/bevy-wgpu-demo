@@ -420,7 +420,7 @@ fn init_pipeline(
 
     let shader = render_device.create_and_validate_shader_module(ShaderModuleDescriptor {
         label: Some("triangle shader"),
-        source: ShaderSource::Wgsl(include_str!("triangle.wgsl").into()),
+        source: ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
     });
 
     let vertex_layout = RawVertexBufferLayout {
