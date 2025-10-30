@@ -1,8 +1,3 @@
-struct FogSettings {
-    color: vec3<f32>,
-    b: f32,
-}
-
 struct Globals {
     time_seconds: f32,
     world_to_clip: mat4x4<f32>,
@@ -10,7 +5,8 @@ struct Globals {
     ambient_light: vec3<f32>,
     directional_light: vec3<f32>,
     directional_light_direction: vec3<f32>,
-    fog: FogSettings,
+    fog_color: vec3<f32>,
+    fog_b: f32,
 }
 
 @group(0) @binding(0)
@@ -44,6 +40,7 @@ struct VertexOutput {
     @location(1) color: vec4<f32>,
     @location(2) normal: vec3<f32>,
     @location(3) uv: vec2<f32>,
+    @location(4) world_pos: vec3<f32>,
 }
 
 @vertex
@@ -66,6 +63,7 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.uv = in.uv;
     out.normal = local_normal_to_world * in.normal;
     out.material_index = instance.texture_index;
+    out.world_pos = world_pos.xyz;
     return out;
 }
 
@@ -86,5 +84,14 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
             * globals.directional_light
         )
     );
-    return vertex.color * texture_color * vec4(light, 1.0);
+    let illuminated_color = vertex.color * texture_color * vec4(light, 1.0);
+    let camera_distance = distance(globals.camera_position, vertex.world_pos);
+    let color = fog_color(illuminated_color, camera_distance);
+    return color;
+}
+
+fn fog_color(color: vec4<f32>, distance: f32) -> vec4<f32> {
+    let fog_amount = 1.0 - exp(-distance * 0.1);
+    let fogged_color = mix(color.xyz, globals.fog_color, fog_amount);
+    return vec4(fogged_color, color.w);
 }

@@ -55,6 +55,13 @@ mod normal;
 mod vertex;
 mod world_gen;
 
+const SKY_COLOR: Color = Color::LinearRgba(LinearRgba {
+    red: 0.1,
+    green: 0.2,
+    blue: 0.4,
+    alpha: 1.0,
+});
+
 fn main() {
     App::new()
         .add_plugins((
@@ -78,6 +85,10 @@ fn main() {
             color: Color::srgb(0.75, 0.75, 0.75),
             direction: Dir3::new(Vec3::new(0.75, -6.0, 2.5))
                 .expect("Non-zero light direction vector"),
+        })
+        .insert_resource(FogSettings {
+            color: SKY_COLOR,
+            b: 0.1,
         })
         .add_systems(
             Startup,
@@ -136,6 +147,12 @@ struct DirectionalLight {
     direction: Dir3,
 }
 
+#[derive(Resource, Clone, Copy)]
+struct FogSettings {
+    color: Color,
+    b: f32,
+}
+
 fn extract_resource_to_render_world<T: Resource + Clone>(
     mut commands: Commands,
     resource: Extract<Option<Res<T>>>,
@@ -178,6 +195,7 @@ impl Plugin for MyRenderPlugin {
                     resize_depth_texture,
                     extract_resource_to_render_world::<AmbientLight>,
                     extract_resource_to_render_world::<DirectionalLight>,
+                    extract_resource_to_render_world::<FogSettings>,
                 ),
             );
 
@@ -703,7 +721,10 @@ impl ViewNode for MyRenderNode {
             globals.directional_light = directional_light.color.to_srgba().to_f32_array_no_alpha();
             globals.directional_light_direction = directional_light.direction.to_array();
         }
-        // info!("{:?}", camera_transform.compute_matrix());
+        if let Some(fog_settings) = world.get_resource::<FogSettings>() {
+            globals.fog_color = fog_settings.color.to_linear().to_f32_array_no_alpha();
+            globals.fog_b = fog_settings.b;
+        }
         let render_queue = world.resource::<RenderQueue>();
         let buffer = world.resource::<GlobalsUniformBuffer>();
         render_queue.write_buffer(&buffer.buffer, 0, bytemuck::bytes_of(&globals));
@@ -747,7 +768,7 @@ impl ViewNode for MyRenderNode {
                 view,
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear(Color::linear_rgb(0.1, 0.2, 0.4).to_linear().into()),
+                    load: LoadOp::Clear(SKY_COLOR.to_linear().into()),
                     store: StoreOp::Store,
                 },
             };
