@@ -13,7 +13,7 @@ pub struct Globals {
     pub directional_light_direction: [f32; 3],
     _pad_4: [f32; 1],
     pub fog_color: [f32; 3],
-    _pad_5: [f32; 1],
+    // _pad_5: [f32; 1],
     pub fog_b: f32,
-    _pad_6: [f32; 3],
+    // _pad_6: [f32; 3],
 }

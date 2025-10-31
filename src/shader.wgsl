@@ -91,7 +91,7 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 fn fog_color(color: vec4<f32>, distance: f32) -> vec4<f32> {
-    let fog_amount = 1.0 - exp(-distance * 0.1);
+    let fog_amount = 1.0 - exp(-distance * globals.fog_b);
     let fogged_color = mix(color.xyz, globals.fog_color, fog_amount);
     return vec4(fogged_color, color.w);
 }

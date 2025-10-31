@@ -88,7 +88,7 @@ fn main() {
         })
         .insert_resource(FogSettings {
             color: SKY_COLOR,
-            b: 0.1,
+            b: 0.001,
         })
         .add_systems(
             Startup,
