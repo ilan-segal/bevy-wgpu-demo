@@ -133,7 +133,7 @@ fn update_component_copy<T: Component + Clone>(
     }
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 pub struct Neighborhood<T> {
     pub chunks: [Option<Arc<T>>; 27],
 }

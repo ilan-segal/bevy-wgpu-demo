@@ -1,6 +1,7 @@
 use std::num::NonZero;
 
 use bevy::prelude::*;
+use lib_async_component::{AsyncComponentPlugin, ComputeTasks};
 use lib_chunk::Neighborhood;
 use lib_utils::cube_iter;
 
@@ -18,7 +19,8 @@ impl Plugin for WorldMeshPlugin {
             .add_systems(Update, assign_quads)
             .add_observer(update_quad_count_for_despawn)
             .add_observer(update_quad_count_for_replace)
-            .add_observer(update_quad_count_for_insert);
+            .add_observer(update_quad_count_for_insert)
+            .add_plugins(AsyncComponentPlugin::<Quads>::new());
     }
 }
 
@@ -72,30 +74,31 @@ fn update_quad_count_for_insert(
     count.0 += quads.0.len() as u32;
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub enum MeshingType {
     Naive,
 }
 
 fn assign_quads(
-    mut commands: Commands,
     meshing_type: Res<MeshingType>,
     q_unmeshed_chunks: Query<
         (Entity, &Neighborhood<Blocks>),
         (With<Chunk>, Changed<Neighborhood<Blocks>>),
     >,
+    mut compute_tasks: ResMut<ComputeTasks<Quads>>,
 ) {
     for (entity, blocks) in q_unmeshed_chunks.iter() {
-        let quads = get_quads(blocks, &meshing_type);
-        let quads = Quads(quads);
-        commands.entity(entity).try_insert(quads);
+        let blocks = blocks.clone();
+        let meshing_type = meshing_type.clone();
+        compute_tasks.spawn_task(entity, async move { get_quads(blocks, meshing_type) });
     }
 }
 
-fn get_quads(blocks: &Neighborhood<Blocks>, meshing_type: &MeshingType) -> Vec<Quad> {
-    match meshing_type {
-        MeshingType::Naive => get_quads_naive(blocks),
-    }
+fn get_quads(blocks: Neighborhood<Blocks>, meshing_type: MeshingType) -> Quads {
+    let quads = match meshing_type {
+        MeshingType::Naive => get_quads_naive(&blocks),
+    };
+    Quads(quads)
 }
 
 fn get_quads_naive(blocks: &Neighborhood<Blocks>) -> Vec<Quad> {

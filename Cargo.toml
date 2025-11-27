@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 bevy = "0.16.1"
 bytemuck = "1.23.2"
+lib_async_component = { path = "./lib_async_component" }
 lib_chunk = { path = "./lib_chunk" }
 lib_first_person_camera = { path = "./lib_first_person_camera" }
 lib_spatial = { path = "./lib_spatial" }

@@ -309,6 +309,7 @@ dependencies = [
  "bevy",
  "bytemuck",
  "iyes_perf_ui",
+ "lib_async_component",
  "lib_chunk",
  "lib_first_person_camera",
  "lib_noise",
@@ -2633,6 +2634,13 @@ dependencies = [
  "byteorder",
  "ogg",
  "tinyvec",
+]
+
+[[package]]
+name = "lib_async_component"
+version = "0.1.0"
+dependencies = [
+ "bevy",
 ]
 
 [[package]]

@@ -61,6 +61,12 @@ const SKY_COLOR: Color = Color::LinearRgba(LinearRgba {
     blue: 0.4,
     alpha: 1.0,
 });
+const FOG_COLOR: Color = Color::LinearRgba(LinearRgba {
+    red: 0.4,
+    green: 0.4,
+    blue: 0.4,
+    alpha: 1.0,
+});
 
 fn main() {
     App::new()
@@ -87,7 +93,7 @@ fn main() {
                 .expect("Non-zero light direction vector"),
         })
         .insert_resource(FogSettings {
-            color: SKY_COLOR,
+            color: FOG_COLOR,
             b: 0.001,
         })
         .add_systems(
