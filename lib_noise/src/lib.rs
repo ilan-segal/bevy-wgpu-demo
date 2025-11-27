@@ -4,6 +4,7 @@ use noise::{NoiseFn, ScalePoint, Simplex, TranslatePoint};
 
 type ScaledTranslatedNoise = TranslatePoint<ScalePoint<Simplex>>;
 
+#[derive(Clone)]
 struct FractalNoisePart {
     a: f64,
     noise: ScaledTranslatedNoise,
@@ -18,6 +19,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct FractalNoise {
     inverse_of_sum_of_scales: f64,
     parts: Vec<FractalNoisePart>,

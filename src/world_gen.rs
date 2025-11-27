@@ -1,6 +1,7 @@
 use std::num::NonZero;
 
 use bevy::{ecs::query::QueryData, prelude::*};
+use lib_async_component::{AsyncComponentPlugin, ComputeTasks};
 use lib_chunk::{ChunkPosition, NeighborhoodPlugin};
 use lib_noise::FractalNoise;
 use lib_spatial::{CHUNK_SIZE, SpatiallyMapped};
@@ -18,6 +19,8 @@ impl Plugin for WorldGenerationPlugin {
             .add_plugins((
                 NeighborhoodPlugin::<HeightNoise>::new(),
                 NeighborhoodPlugin::<Blocks>::new(),
+                AsyncComponentPlugin::<HeightNoise>::new(),
+                AsyncComponentPlugin::<Blocks>::new(),
             ))
             .add_systems(
                 Startup,
@@ -28,7 +31,7 @@ impl Plugin for WorldGenerationPlugin {
 }
 
 fn spawn_chunk_at_center_of_world(mut commands: Commands) {
-    for (x, y, z) in cube_iter(-2..=2) {
+    for (x, y, z) in cube_iter(-8..=8) {
         let pos = IVec3::new(x, y, z);
         commands.spawn((Chunk, ChunkPosition(pos)));
     }
@@ -56,7 +59,7 @@ pub struct Chunk;
 struct HeightNoise(Vec<f64>);
 
 impl HeightNoise {
-    fn from_noise(chunk_position: &ChunkPosition, noise: &FractalNoise) -> Self {
+    fn from_noise(chunk_position: ChunkPosition, noise: FractalNoise) -> Self {
         let offset = chunk_position.0 * CHUNK_SIZE as i32;
         let values = square_iter(0..CHUNK_SIZE as i32)
             .map(|(x, z)| [x + offset.x, z + offset.z])
@@ -67,13 +70,16 @@ impl HeightNoise {
 }
 
 fn assign_height_noise(
-    mut commands: Commands,
     q_chunks: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<HeightNoise>)>,
     generator: Res<HeightNoiseGenerator>,
+    mut height_noise_tasks: ResMut<ComputeTasks<HeightNoise>>,
 ) {
     for (entity, chunk_position) in q_chunks.iter() {
-        let height_noise = HeightNoise::from_noise(chunk_position, &generator.0);
-        commands.entity(entity).try_insert(height_noise);
+        let chunk_position = *chunk_position;
+        let generator = generator.0.clone();
+        height_noise_tasks.spawn_task(entity, async move {
+            HeightNoise::from_noise(chunk_position, generator)
+        });
     }
 }
 
