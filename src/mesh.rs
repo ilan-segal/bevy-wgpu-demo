@@ -1,7 +1,7 @@
 use std::num::NonZero;
 
 use bevy::prelude::*;
-use lib_async_component::{AsyncComponentPlugin, ComputeTasks};
+use lib_async_component::{AsyncComponentPlugin, ComputeInProgress, ComputeTasks};
 use lib_chunk::Neighborhood;
 use lib_utils::cube_iter;
 
@@ -83,7 +83,11 @@ fn assign_quads(
     meshing_type: Res<MeshingType>,
     q_unmeshed_chunks: Query<
         (Entity, &Neighborhood<Blocks>),
-        (With<Chunk>, Changed<Neighborhood<Blocks>>),
+        (
+            With<Chunk>,
+            Changed<Neighborhood<Blocks>>,
+            Without<ComputeInProgress<Quads>>,
+        ),
     >,
     mut compute_tasks: ResMut<ComputeTasks<Quads>>,
 ) {

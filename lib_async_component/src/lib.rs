@@ -1,4 +1,7 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+};
 
 use bevy::{
     ecs::world::OnDespawn,
@@ -20,10 +23,18 @@ impl<T: Component> AsyncComponentPlugin<T> {
 
 impl<T: Component> Plugin for AsyncComponentPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ComputeTasks {
-            tasks: HashMap::<Entity, Task<T>>::new(),
+        app.insert_resource(ComputeTasks::<T> {
+            tasks: HashMap::new(),
+            added_since_last_update: HashSet::new(),
         })
-        .add_systems(Update, recieve_compute_tasks::<T>)
+        .add_systems(
+            PostUpdate,
+            (
+                update_compute_in_progress_flags::<T>,
+                recieve_compute_tasks::<T>,
+            )
+                .chain(),
+        )
         .add_observer(kill_compute_task::<T>);
     }
 }
@@ -31,6 +42,12 @@ impl<T: Component> Plugin for AsyncComponentPlugin<T> {
 #[derive(Resource)]
 pub struct ComputeTasks<T> {
     tasks: HashMap<Entity, Task<T>>,
+    added_since_last_update: HashSet<Entity>,
+}
+
+#[derive(Component)]
+pub struct ComputeInProgress<T> {
+    _phantom: PhantomData<T>,
 }
 
 impl<T: Send + 'static> ComputeTasks<T> {
@@ -42,6 +59,18 @@ impl<T: Send + 'static> ComputeTasks<T> {
         let pool = AsyncComputeTaskPool::get();
         let task = pool.spawn(future);
         self.tasks.insert(entity, task);
+        self.added_since_last_update.insert(entity);
+    }
+}
+
+fn update_compute_in_progress_flags<T: Component>(
+    mut commands: Commands,
+    mut tasks: ResMut<ComputeTasks<T>>,
+) {
+    for entity in tasks.added_since_last_update.drain() {
+        commands.entity(entity).try_insert(ComputeInProgress {
+            _phantom: PhantomData::<T>,
+        });
     }
 }
 
@@ -50,12 +79,15 @@ fn recieve_compute_tasks<T: Component>(mut commands: Commands, mut tasks: ResMut
         let Some(result) = block_on(future::poll_once(task)) else {
             return true;
         };
-        commands.entity(*entity).try_insert(result);
+        commands
+            .entity(*entity)
+            .try_insert(result)
+            .try_remove::<ComputeInProgress<T>>();
         return false;
     });
 }
 
-fn kill_compute_task<T: Send + 'static>(
+fn kill_compute_task<T: Component>(
     trigger: Trigger<OnDespawn>,
     mut tasks: ResMut<ComputeTasks<T>>,
 ) {

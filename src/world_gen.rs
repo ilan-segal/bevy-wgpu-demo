@@ -1,7 +1,7 @@
 use std::num::NonZero;
 
 use bevy::{ecs::query::QueryData, prelude::*};
-use lib_async_component::{AsyncComponentPlugin, ComputeTasks};
+use lib_async_component::{AsyncComponentPlugin, ComputeInProgress, ComputeTasks};
 use lib_chunk::{ChunkPosition, NeighborhoodPlugin};
 use lib_noise::FractalNoise;
 use lib_spatial::{CHUNK_SIZE, SpatiallyMapped};
@@ -70,7 +70,14 @@ impl HeightNoise {
 }
 
 fn assign_height_noise(
-    q_chunks: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<HeightNoise>)>,
+    q_chunks: Query<
+        (Entity, &ChunkPosition),
+        (
+            With<Chunk>,
+            Without<HeightNoise>,
+            Without<ComputeInProgress<HeightNoise>>,
+        ),
+    >,
     generator: Res<HeightNoiseGenerator>,
     mut height_noise_tasks: ResMut<ComputeTasks<HeightNoise>>,
 ) {
