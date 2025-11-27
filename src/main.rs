@@ -67,6 +67,7 @@ const FOG_COLOR: Color = Color::LinearRgba(LinearRgba {
     blue: 0.4,
     alpha: 1.0,
 });
+const AMBIENT_LIGHT: Color = Color::srgb(0.1, 0.1, 0.1);
 
 fn main() {
     App::new()
@@ -86,7 +87,7 @@ fn main() {
             WorldMeshPlugin,
         ))
         .insert_resource(MeshingType::Naive)
-        .insert_resource(AmbientLight(Color::srgb(0.1, 0.1, 0.1)))
+        .insert_resource(AmbientLight(AMBIENT_LIGHT))
         .insert_resource(DirectionalLight {
             color: Color::srgb(0.75, 0.75, 0.75),
             direction: Dir3::new(Vec3::new(0.75, -6.0, 2.5))
