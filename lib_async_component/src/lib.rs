@@ -1,6 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use bevy::{
+    ecs::world::OnDespawn,
     prelude::*,
     tasks::{AsyncComputeTaskPool, Task, block_on, futures_lite::future},
 };
@@ -22,7 +23,8 @@ impl<T: Component> Plugin for AsyncComponentPlugin<T> {
         app.insert_resource(ComputeTasks {
             tasks: HashMap::<Entity, Task<T>>::new(),
         })
-        .add_systems(Update, recieve_compute_tasks::<T>);
+        .add_systems(Update, recieve_compute_tasks::<T>)
+        .add_observer(kill_compute_task::<T>);
     }
 }
 
@@ -51,4 +53,12 @@ fn recieve_compute_tasks<T: Component>(mut commands: Commands, mut tasks: ResMut
         commands.entity(*entity).try_insert(result);
         return false;
     });
+}
+
+fn kill_compute_task<T: Send + 'static>(
+    trigger: Trigger<OnDespawn>,
+    mut tasks: ResMut<ComputeTasks<T>>,
+) {
+    let entity = trigger.target();
+    tasks.tasks.remove(&entity);
 }
