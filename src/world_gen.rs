@@ -31,7 +31,7 @@ impl Plugin for WorldGenerationPlugin {
 }
 
 fn spawn_chunk_at_center_of_world(mut commands: Commands) {
-    for (x, y, z) in cube_iter(-8..=8) {
+    for (x, y, z) in cube_iter(-3..=3) {
         let pos = IVec3::new(x, y, z);
         commands.spawn((Chunk, ChunkPosition(pos)));
     }

@@ -85,8 +85,10 @@ fn assign_quads(
         (Entity, &Neighborhood<Blocks>),
         (
             With<Chunk>,
-            Changed<Neighborhood<Blocks>>,
-            Without<ComputeInProgress<Quads>>,
+            Or<(
+                Changed<Neighborhood<Blocks>>,
+                Without<ComputeInProgress<Quads>>,
+            )>,
         ),
     >,
     mut compute_tasks: ResMut<ComputeTasks<Quads>>,
