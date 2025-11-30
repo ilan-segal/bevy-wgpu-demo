@@ -16,4 +16,5 @@ pub struct Globals {
     // _pad_5: [f32; 1],
     pub fog_b: f32,
     // _pad_6: [f32; 3],
+    pub shadow_map_projection: [[f32; 4]; 4],
 }

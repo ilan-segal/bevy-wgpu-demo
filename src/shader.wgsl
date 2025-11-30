@@ -7,6 +7,7 @@ struct Globals {
     directional_light_direction: vec3<f32>,
     fog_color: vec3<f32>,
     fog_b: f32,
+    shadow_map_projection: mat4x4<f32>,
 }
 
 @group(0) @binding(0)

@@ -55,18 +55,8 @@ mod normal;
 mod vertex;
 mod world_gen;
 
-const SKY_COLOR: Color = Color::LinearRgba(LinearRgba {
-    red: 0.1,
-    green: 0.2,
-    blue: 0.4,
-    alpha: 1.0,
-});
-const FOG_COLOR: Color = Color::LinearRgba(LinearRgba {
-    red: 0.4,
-    green: 0.4,
-    blue: 0.4,
-    alpha: 1.0,
-});
+const SKY_COLOR: Color = Color::linear_rgba(0.1, 0.2, 0.4, 1.0);
+const FOG_COLOR: Color = Color::linear_rgba(0.4, 0.4, 0.4, 1.0);
 const AMBIENT_LIGHT: Color = Color::srgb(0.1, 0.1, 0.1);
 
 fn main() {
@@ -365,6 +355,11 @@ struct MyRenderPipeline {
 }
 
 #[derive(Resource)]
+struct MyShadowMapPipeline {
+    pipeline: RenderPipeline,
+}
+
+#[derive(Resource)]
 struct GlobalsUniformBuffer {
     buffer: Buffer,
 }
@@ -375,18 +370,33 @@ struct GlobalsUniformBindGroup {
 }
 
 #[derive(Resource)]
+struct ShadowPassGlobalsUniformBuffer {
+    buffer: Buffer,
+}
+
+#[derive(Resource)]
+struct ShadowPassGlobalsUniformBindGroup {
+    bind_group: BindGroup,
+}
+
+#[derive(Resource)]
 pub struct IndexBuffer {
     buffer: Buffer,
     num_indices: u32,
 }
 
-#[derive(Resource)]
 pub struct DepthTexture {
     view: TextureView,
     format: TextureFormat,
     #[allow(unused)]
     size: UVec2,
 }
+
+#[derive(Resource)]
+pub struct MainPassDepth(DepthTexture);
+
+#[derive(Resource)]
+pub struct ShadowPassDepth(DepthTexture);
 
 fn init_pipeline(
     mut commands: Commands,
@@ -402,9 +412,17 @@ fn init_pipeline(
 
     let window = windows.single().expect("Main window");
     let depth_texture = create_depth_texture(
+        "depth texture",
         &render_device,
         window.physical_width(),
         window.physical_height(),
+    );
+    const SHADOW_MAP_SIZE: u32 = 2048;
+    let shadow_map = create_depth_texture(
+        "shadow map",
+        &render_device,
+        SHADOW_MAP_SIZE,
+        SHADOW_MAP_SIZE,
     );
 
     let globals_bind_group_layout = render_device.create_bind_group_layout(
@@ -436,11 +454,35 @@ fn init_pipeline(
             resource: globals_buffer.as_entire_binding(),
         }],
     );
+
+    let shadow_pass_globals_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("globals buffer"),
+        size: std::mem::size_of::<Globals>() as u64,
+        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    let shadow_pass_globals_bind_group = render_device.create_bind_group(
+        Some("Shadow pass globals bind group"),
+        &globals_bind_group_layout,
+        &[BindGroupEntry {
+            binding: 0,
+            resource: shadow_pass_globals_buffer.as_entire_binding(),
+        }],
+    );
+
     commands.insert_resource(GlobalsUniformBuffer {
         buffer: globals_buffer,
     });
     commands.insert_resource(GlobalsUniformBindGroup {
         bind_group: globals_bind_group,
+    });
+
+    commands.insert_resource(ShadowPassGlobalsUniformBuffer {
+        buffer: shadow_pass_globals_buffer,
+    });
+    commands.insert_resource(ShadowPassGlobalsUniformBindGroup {
+        bind_group: shadow_pass_globals_bind_group,
     });
 
     let shader = render_device.create_and_validate_shader_module(ShaderModuleDescriptor {
@@ -472,18 +514,18 @@ fn init_pipeline(
     });
 
     let layout = render_device.create_pipeline_layout(&PipelineLayoutDescriptor {
-        label: Some("triangle pipeline layout"),
+        label: Some("main pipeline layout"),
         bind_group_layouts: &[&globals_bind_group_layout, &texture_bind_group.layout],
         push_constant_ranges: &[],
     });
 
     let pipeline = render_device.create_render_pipeline(&RawRenderPipelineDescriptor {
-        label: Some("triangle pipeline"),
+        label: Some("main pipeline"),
         layout: Some(&layout),
         vertex: RawVertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[vertex_layout, instance_layout],
+            buffers: &[vertex_layout.clone(), instance_layout.clone()],
             compilation_options: default(),
         },
         fragment: Some(RawFragmentState {
@@ -513,13 +555,50 @@ fn init_pipeline(
         cache: None,
     });
 
-    commands.insert_resource(depth_texture);
+    let shadow_pipeline_layout = render_device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        label: Some("shadow pipeline layout"),
+        bind_group_layouts: &[&globals_bind_group_layout],
+        push_constant_ranges: &[],
+    });
+
+    let shadow_pass_pipeline = render_device.create_render_pipeline(&RawRenderPipelineDescriptor {
+        label: Some("shadow pipeline"),
+        layout: Some(&shadow_pipeline_layout),
+        vertex: RawVertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[vertex_layout, instance_layout],
+            compilation_options: default(),
+        },
+        fragment: None,
+        primitive: PrimitiveState {
+            topology: PrimitiveTopology::TriangleStrip,
+            cull_mode: Some(Face::Back),
+            ..Default::default()
+        },
+        depth_stencil: Some(DepthStencilState {
+            format: shadow_map.format,
+            depth_write_enabled: true,
+            depth_compare: CompareFunction::Greater,
+            stencil: StencilState::default(),
+            bias: DepthBiasState::default(),
+        }),
+        multisample: default(),
+        multiview: None,
+        cache: None,
+    });
+
+    commands.insert_resource(MainPassDepth(depth_texture));
     commands.insert_resource(MyRenderPipeline { pipeline });
+    commands.insert_resource(ShadowPassDepth(shadow_map));
+    commands.insert_resource(MyShadowMapPipeline {
+        pipeline: shadow_pass_pipeline,
+    });
 }
 
 fn resize_depth_texture(
     mut resize_events: Extract<EventReader<WindowResized>>,
-    mut depth: Option<ResMut<DepthTexture>>,
+    mut depth: Option<ResMut<MainPassDepth>>,
     render_device: Res<RenderDevice>,
 ) {
     let Some(ref mut depth) = depth else {
@@ -528,11 +607,16 @@ fn resize_depth_texture(
     for event in resize_events.read() {
         let width = event.width as u32;
         let height = event.height as u32;
-        **depth = create_depth_texture(&render_device, width, height);
+        depth.0 = create_depth_texture("depth texture", &render_device, width, height);
     }
 }
 
-fn create_depth_texture(device: &RenderDevice, width: u32, height: u32) -> DepthTexture {
+fn create_depth_texture(
+    name: &'static str,
+    device: &RenderDevice,
+    width: u32,
+    height: u32,
+) -> DepthTexture {
     let format = TextureFormat::Depth32Float;
     let size = Extent3d {
         width,
@@ -541,7 +625,7 @@ fn create_depth_texture(device: &RenderDevice, width: u32, height: u32) -> Depth
     };
 
     let desc = TextureDescriptor {
-        label: Some("depth_texture"),
+        label: Some(name),
         size,
         mip_level_count: 1,
         sample_count: 1,
@@ -717,6 +801,7 @@ impl ViewNode for MyRenderNode {
         } = world.resource::<CameraData>();
         let StartupTime(startup_time) = world.resource::<StartupTime>();
         let elapsed_seconds = startup_time.elapsed().as_secs_f32();
+
         let mut globals = Globals::default();
         globals.elapsed_seconds = elapsed_seconds;
         globals.projection_matrix = projection_matrix.to_cols_array_2d();
@@ -727,14 +812,38 @@ impl ViewNode for MyRenderNode {
         if let Some(directional_light) = world.get_resource::<DirectionalLight>() {
             globals.directional_light = directional_light.color.to_srgba().to_f32_array_no_alpha();
             globals.directional_light_direction = directional_light.direction.to_array();
+            const SHADOW_SIZE: f32 = 100.0;
+            let shadow_projection =
+                Mat4::orthographic_rh(
+                    -SHADOW_SIZE,
+                    SHADOW_SIZE,
+                    -SHADOW_SIZE,
+                    SHADOW_SIZE,
+                    1e-6,
+                    1e6,
+                ) * Transform::from_translation(directional_light.direction.as_vec3() * -1e5)
+                    .looking_to(directional_light.direction, Vec3::Y)
+                    .compute_matrix()
+                    .inverse();
+            globals.shadow_map_projection = shadow_projection.to_cols_array_2d();
         }
         if let Some(fog_settings) = world.get_resource::<FogSettings>() {
             globals.fog_color = fog_settings.color.to_linear().to_f32_array_no_alpha();
             globals.fog_b = fog_settings.b;
         }
+
         let render_queue = world.resource::<RenderQueue>();
         let buffer = world.resource::<GlobalsUniformBuffer>();
         render_queue.write_buffer(&buffer.buffer, 0, bytemuck::bytes_of(&globals));
+
+        let mut shadow_pass_globals = globals.clone();
+        shadow_pass_globals.projection_matrix = globals.shadow_map_projection;
+        let shadow_pass_buffer = world.resource::<ShadowPassGlobalsUniformBuffer>();
+        render_queue.write_buffer(
+            &shadow_pass_buffer.buffer,
+            0,
+            bytemuck::bytes_of(&shadow_pass_globals),
+        );
     }
 
     fn run<'w>(
@@ -747,29 +856,73 @@ impl ViewNode for MyRenderNode {
         if world.contains_resource::<PipelineIsNotInitialized>() {
             return Ok(());
         }
-        let pipeline = world.resource::<MyRenderPipeline>();
+        let shadow_pipeline = world.resource::<MyShadowMapPipeline>();
+        let shadow_depth = world.resource::<ShadowPassDepth>();
+        let main_pipeline = world.resource::<MyRenderPipeline>();
         let VertexBuffer { vertex_buffer, .. } = world.resource::<VertexBuffer>();
         let IndexBuffer {
             buffer: index_buffer,
             num_indices,
         } = world.resource::<IndexBuffer>();
-        let depth = world.resource::<DepthTexture>();
+        let depth = world.resource::<MainPassDepth>();
 
         let Some(mut query) =
             world.try_query_filtered::<(&ViewTarget, &ExtractedCamera), With<Camera>>()
         else {
-            panic!();
+            panic!("Failed query for view target and extracted camera");
         };
 
         let GlobalsUniformBindGroup {
             bind_group: globals_uniform_bind_group,
         } = world.resource::<GlobalsUniformBindGroup>();
+        let ShadowPassGlobalsUniformBindGroup {
+            bind_group: shadow_pass_globals_uniform_bind_group,
+        } = world.resource::<ShadowPassGlobalsUniformBindGroup>();
         let TextureBindGroup {
             bind_group: texture_bind_group,
             ..
         } = world.resource::<TextureBindGroup>();
 
         for (view_target, _cam) in query.iter(&world) {
+            let shadow_pass_desc = RenderPassDescriptor {
+                label: Some("shadow_pass"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &shadow_depth.0.view,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(0.0),
+                        store: StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            };
+            {
+                let mut shadow_pass = render_context
+                    .command_encoder()
+                    .begin_render_pass(&shadow_pass_desc);
+                shadow_pass.set_pipeline(&shadow_pipeline.pipeline);
+                shadow_pass.set_bind_group(0, shadow_pass_globals_uniform_bind_group, &[]);
+                shadow_pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
+                shadow_pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
+
+                for InstanceBuffer {
+                    buffer: instance_buffer,
+                    num_instances,
+                } in world
+                    .resource::<InstanceBuffers>()
+                    .chunk_pos_to_buffer
+                    .values()
+                {
+                    if num_instances == &0 {
+                        continue;
+                    }
+                    shadow_pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
+                    shadow_pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
+                }
+            }
+
             let view = view_target.main_texture_view();
             let color_attachment = RenderPassColorAttachment {
                 view,
@@ -784,7 +937,7 @@ impl ViewNode for MyRenderNode {
                 label: Some("triangle_pass"),
                 color_attachments: &[Some(color_attachment)],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view,
+                    view: &depth.0.view,
                     depth_ops: Some(Operations {
                         load: LoadOp::Clear(0.0),
                         store: StoreOp::Store,
@@ -795,37 +948,28 @@ impl ViewNode for MyRenderNode {
                 occlusion_query_set: None,
             };
 
-            let mut pass = render_context.command_encoder().begin_render_pass(&desc);
-            pass.set_pipeline(&pipeline.pipeline);
-            pass.set_bind_group(0, globals_uniform_bind_group, &[]);
-            pass.set_bind_group(1, texture_bind_group, &[]);
-            pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
-            pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
-
-            // if let Some(InstanceBuffer {
-            //     buffer: instance_buffer,
-            //     num_instances,
-            // }) = world.get_resource::<InstanceBuffer>()
-            // {
-            //     if num_instances > &0 {
-            //         pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
-            //         pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
-            //     }
-            // }
-
-            for InstanceBuffer {
-                buffer: instance_buffer,
-                num_instances,
-            } in world
-                .resource::<InstanceBuffers>()
-                .chunk_pos_to_buffer
-                .values()
             {
-                if num_instances == &0 {
-                    continue;
+                let mut pass = render_context.command_encoder().begin_render_pass(&desc);
+                pass.set_pipeline(&main_pipeline.pipeline);
+                pass.set_bind_group(0, globals_uniform_bind_group, &[]);
+                pass.set_bind_group(1, texture_bind_group, &[]);
+                pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
+                pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
+
+                for InstanceBuffer {
+                    buffer: instance_buffer,
+                    num_instances,
+                } in world
+                    .resource::<InstanceBuffers>()
+                    .chunk_pos_to_buffer
+                    .values()
+                {
+                    if num_instances == &0 {
+                        continue;
+                    }
+                    pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
+                    pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
                 }
-                pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
-                pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
             }
         }
 
