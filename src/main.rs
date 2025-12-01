@@ -80,7 +80,7 @@ fn main() {
         .insert_resource(AmbientLight(AMBIENT_LIGHT))
         .insert_resource(DirectionalLight {
             color: Color::srgb(0.75, 0.75, 0.75),
-            direction: Dir3::new(Vec3::new(0.75, -6.0, 2.5))
+            direction: Dir3::new(Vec3::new(1.0, -1.0, 1.0))
                 .expect("Non-zero light direction vector"),
         })
         .insert_resource(FogSettings {
@@ -398,6 +398,13 @@ pub struct MainPassDepth(DepthTexture);
 #[derive(Resource)]
 pub struct ShadowPassDepth(DepthTexture);
 
+#[derive(Resource)]
+struct ShadowMapTextureBindGroup {
+    bind_group: BindGroup,
+    #[allow(unused)]
+    layout: BindGroupLayout,
+}
+
 fn init_pipeline(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
@@ -513,9 +520,94 @@ fn init_pipeline(
         num_indices,
     });
 
+    let shadow_pipeline_layout = render_device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        label: Some("shadow pipeline layout"),
+        bind_group_layouts: &[&globals_bind_group_layout],
+        push_constant_ranges: &[],
+    });
+
+    let shadow_pass_pipeline = render_device.create_render_pipeline(&RawRenderPipelineDescriptor {
+        label: Some("shadow pipeline"),
+        layout: Some(&shadow_pipeline_layout),
+        vertex: RawVertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[vertex_layout.clone(), instance_layout.clone()],
+            compilation_options: default(),
+        },
+        fragment: None,
+        primitive: PrimitiveState {
+            topology: PrimitiveTopology::TriangleStrip,
+            cull_mode: Some(Face::Back),
+            ..Default::default()
+        },
+        depth_stencil: Some(DepthStencilState {
+            format: shadow_map.format,
+            depth_write_enabled: true,
+            depth_compare: CompareFunction::Greater,
+            stencil: StencilState::default(),
+            bias: DepthBiasState::default(),
+        }),
+        multisample: default(),
+        multiview: None,
+        cache: None,
+    });
+
+    let shadow_map_sampler = render_device.create_sampler(&SamplerDescriptor {
+        label: Some("shadow map sampler"),
+        mag_filter: FilterMode::Nearest,
+        min_filter: FilterMode::Linear,
+        mipmap_filter: FilterMode::Nearest,
+        address_mode_u: AddressMode::ClampToBorder,
+        address_mode_v: AddressMode::ClampToBorder,
+        address_mode_w: AddressMode::ClampToBorder,
+        ..Default::default()
+    });
+    let shadow_map_bind_group_layout = render_device.create_bind_group_layout(
+        Some("shadow map bind group layout"),
+        &[
+            // Texture binding
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    sample_type: TextureSampleType::Depth,
+                    view_dimension: TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            // Sampler binding
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    );
+    let shadow_map_bind_group = render_device.create_bind_group(
+        Some("My texture bind group"),
+        &shadow_map_bind_group_layout,
+        &[
+            BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::TextureView(&shadow_map.view),
+            },
+            BindGroupEntry {
+                binding: 1,
+                resource: BindingResource::Sampler(&shadow_map_sampler),
+            },
+        ],
+    );
+
     let layout = render_device.create_pipeline_layout(&PipelineLayoutDescriptor {
         label: Some("main pipeline layout"),
-        bind_group_layouts: &[&globals_bind_group_layout, &texture_bind_group.layout],
+        bind_group_layouts: &[
+            &globals_bind_group_layout,
+            &texture_bind_group.layout,
+            &shadow_map_bind_group_layout,
+        ],
         push_constant_ranges: &[],
     });
 
@@ -555,42 +647,13 @@ fn init_pipeline(
         cache: None,
     });
 
-    let shadow_pipeline_layout = render_device.create_pipeline_layout(&PipelineLayoutDescriptor {
-        label: Some("shadow pipeline layout"),
-        bind_group_layouts: &[&globals_bind_group_layout],
-        push_constant_ranges: &[],
-    });
-
-    let shadow_pass_pipeline = render_device.create_render_pipeline(&RawRenderPipelineDescriptor {
-        label: Some("shadow pipeline"),
-        layout: Some(&shadow_pipeline_layout),
-        vertex: RawVertexState {
-            module: &shader,
-            entry_point: Some("vs_main"),
-            buffers: &[vertex_layout, instance_layout],
-            compilation_options: default(),
-        },
-        fragment: None,
-        primitive: PrimitiveState {
-            topology: PrimitiveTopology::TriangleStrip,
-            cull_mode: Some(Face::Back),
-            ..Default::default()
-        },
-        depth_stencil: Some(DepthStencilState {
-            format: shadow_map.format,
-            depth_write_enabled: true,
-            depth_compare: CompareFunction::Greater,
-            stencil: StencilState::default(),
-            bias: DepthBiasState::default(),
-        }),
-        multisample: default(),
-        multiview: None,
-        cache: None,
-    });
-
     commands.insert_resource(MainPassDepth(depth_texture));
     commands.insert_resource(MyRenderPipeline { pipeline });
     commands.insert_resource(ShadowPassDepth(shadow_map));
+    commands.insert_resource(ShadowMapTextureBindGroup {
+        bind_group: shadow_map_bind_group,
+        layout: shadow_map_bind_group_layout,
+    });
     commands.insert_resource(MyShadowMapPipeline {
         pipeline: shadow_pass_pipeline,
     });
@@ -812,16 +875,16 @@ impl ViewNode for MyRenderNode {
         if let Some(directional_light) = world.get_resource::<DirectionalLight>() {
             globals.directional_light = directional_light.color.to_srgba().to_f32_array_no_alpha();
             globals.directional_light_direction = directional_light.direction.to_array();
-            const SHADOW_SIZE: f32 = 100.0;
+            const SHADOW_SIZE: f32 = 200.0;
             let shadow_projection =
                 Mat4::orthographic_rh(
                     -SHADOW_SIZE,
                     SHADOW_SIZE,
                     -SHADOW_SIZE,
                     SHADOW_SIZE,
-                    1e-6,
+                    1e-2,
                     1e6,
-                ) * Transform::from_translation(directional_light.direction.as_vec3() * -1e5)
+                ) * Transform::from_translation(directional_light.direction * -1e3)
                     .looking_to(directional_light.direction, Vec3::Y)
                     .compute_matrix()
                     .inverse();
@@ -882,6 +945,10 @@ impl ViewNode for MyRenderNode {
             bind_group: texture_bind_group,
             ..
         } = world.resource::<TextureBindGroup>();
+        let ShadowMapTextureBindGroup {
+            bind_group: shadow_map_bind_group,
+            ..
+        } = world.resource::<ShadowMapTextureBindGroup>();
 
         for (view_target, _cam) in query.iter(&world) {
             let shadow_pass_desc = RenderPassDescriptor {
@@ -953,6 +1020,7 @@ impl ViewNode for MyRenderNode {
                 pass.set_pipeline(&main_pipeline.pipeline);
                 pass.set_bind_group(0, globals_uniform_bind_group, &[]);
                 pass.set_bind_group(1, texture_bind_group, &[]);
+                pass.set_bind_group(2, shadow_map_bind_group, &[]);
                 pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
                 pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
 
