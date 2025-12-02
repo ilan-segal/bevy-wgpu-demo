@@ -124,5 +124,5 @@ fn get_light_factor_from_sun(world_pos: vec3<f32>) -> f32 {
         uv,
         receiver_depth
     );
-    return lit;
+    return 1.0 - lit;
 }
