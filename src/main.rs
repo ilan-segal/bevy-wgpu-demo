@@ -555,7 +555,8 @@ fn init_pipeline(
 
     let shadow_map_sampler = render_device.create_sampler(&SamplerDescriptor {
         label: Some("shadow map sampler"),
-        mag_filter: FilterMode::Nearest,
+        compare: Some(CompareFunction::LessEqual),
+        mag_filter: FilterMode::Linear,
         min_filter: FilterMode::Linear,
         mipmap_filter: FilterMode::Nearest,
         address_mode_u: AddressMode::ClampToBorder,
@@ -581,7 +582,7 @@ fn init_pipeline(
             BindGroupLayoutEntry {
                 binding: 1,
                 visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                ty: BindingType::Sampler(SamplerBindingType::Comparison),
                 count: None,
             },
         ],
@@ -763,8 +764,10 @@ fn update_camera_data(
             return;
         }
     };
-    let projection_matrix =
-        projection.get_clip_from_view() * camera_transform.compute_matrix().inverse();
+    let projection_matrix = projection.get_clip_from_view()
+        * camera_transform
+            .compute_matrix()
+            .inverse();
     camera_data.projection_matrix = projection_matrix;
     camera_data.position = camera_transform.translation();
 }
@@ -799,7 +802,9 @@ fn remove_buffer_for_despawned_chunk(
     mut instance_buffers: ResMut<InstanceBuffers>,
 ) {
     for ChunkDespawn(ChunkPosition(pos)) in er.read() {
-        instance_buffers.chunk_pos_to_buffer.remove(pos);
+        instance_buffers
+            .chunk_pos_to_buffer
+            .remove(pos);
     }
 }
 
@@ -835,7 +840,13 @@ fn create_instance(quad: &Quad, chunk_position: &ChunkPosition) -> DetailedInsta
     let transform =
         Transform::from_translation(quad.pos.as_vec3() + 32.0 * chunk_position.0.as_vec3())
             .with_scale(Vec3::new(quad.width.get() as _, quad.height.get() as _, 1.))
-            .looking_to(quad.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y);
+            .looking_to(
+                quad.normal
+                    .as_unit_direction()
+                    .as_vec3()
+                    * -0.5,
+                Vec3::Y,
+            );
     DetailedInstance {
         transform,
         texture_index: quad
@@ -870,28 +881,41 @@ impl ViewNode for MyRenderNode {
         globals.projection_matrix = projection_matrix.to_cols_array_2d();
         globals.camera_position = camera_position.to_array();
         if let Some(AmbientLight(colour)) = world.get_resource::<AmbientLight>() {
-            globals.ambient_light = colour.to_srgba().to_f32_array_no_alpha();
+            globals.ambient_light = colour
+                .to_srgba()
+                .to_f32_array_no_alpha();
         }
         if let Some(directional_light) = world.get_resource::<DirectionalLight>() {
-            globals.directional_light = directional_light.color.to_srgba().to_f32_array_no_alpha();
+            globals.directional_light = directional_light
+                .color
+                .to_srgba()
+                .to_f32_array_no_alpha();
             globals.directional_light_direction = directional_light.direction.to_array();
-            const SHADOW_SIZE: f32 = 200.0;
-            let shadow_projection =
-                Mat4::orthographic_rh(
-                    -SHADOW_SIZE,
-                    SHADOW_SIZE,
-                    -SHADOW_SIZE,
-                    SHADOW_SIZE,
-                    1e-2,
-                    1e6,
-                ) * Transform::from_translation(directional_light.direction * -1e3)
-                    .looking_to(directional_light.direction, Vec3::Y)
-                    .compute_matrix()
-                    .inverse();
+            const SHADOW_SIZE: f32 = 100.0;
+            let shadow_projection = Mat4::orthographic_rh(
+                -SHADOW_SIZE,
+                SHADOW_SIZE,
+                -SHADOW_SIZE,
+                SHADOW_SIZE,
+                1e-6,
+                SHADOW_SIZE,
+            ) * Transform::from_translation(
+                directional_light
+                    .direction
+                    .with_y(-directional_light.direction.y)
+                    * -SHADOW_SIZE
+                    * 0.5,
+            )
+            .looking_at(Vec3::ZERO, Vec3::Y)
+            .compute_matrix()
+            .inverse();
             globals.shadow_map_projection = shadow_projection.to_cols_array_2d();
         }
         if let Some(fog_settings) = world.get_resource::<FogSettings>() {
-            globals.fog_color = fog_settings.color.to_linear().to_f32_array_no_alpha();
+            globals.fog_color = fog_settings
+                .color
+                .to_linear()
+                .to_f32_array_no_alpha();
             globals.fog_b = fog_settings.b;
         }
 
@@ -1016,7 +1040,9 @@ impl ViewNode for MyRenderNode {
             };
 
             {
-                let mut pass = render_context.command_encoder().begin_render_pass(&desc);
+                let mut pass = render_context
+                    .command_encoder()
+                    .begin_render_pass(&desc);
                 pass.set_pipeline(&main_pipeline.pipeline);
                 pass.set_bind_group(0, globals_uniform_bind_group, &[]);
                 pass.set_bind_group(1, texture_bind_group, &[]);

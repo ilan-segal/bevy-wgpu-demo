@@ -19,7 +19,7 @@ var my_sampler: sampler;
 @group(2) @binding(0)
 var shadow_map: texture_depth_2d;
 @group(2) @binding(1)
-var shadow_map_sampler: sampler;
+var shadow_map_sampler: sampler_comparison;
 
 // Vertex shader
 
@@ -82,15 +82,13 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
         vertex.uv,
         vertex.material_index
     );
-    var directional_illumination: vec3<f32>;
-    if is_in_shadow(vertex.world_pos) {
-        directional_illumination = vec3(0.0);
-    } else {
-        directional_illumination = (
-            max(0.0, dot(vertex.normal, globals.directional_light_direction))
-            * globals.directional_light
-        );
-    }
+    let sunlight_factor = get_light_factor_from_sun(vertex.world_pos);
+    // return vec4(sunlight_factor, sunlight_factor, sunlight_factor, 1.0);
+    let directional_illumination = (
+        sunlight_factor
+        * max(0.0, dot(vertex.normal, globals.directional_light_direction))
+        * globals.directional_light
+    );
     let light = globals.ambient_light + directional_illumination;
     let illuminated_color = vertex.color * texture_color * vec4(light, 1.0);
     let camera_distance = distance(globals.camera_position, vertex.world_pos);
@@ -104,26 +102,27 @@ fn fog_color(color: vec4<f32>, distance: f32) -> vec4<f32> {
     return vec4(fogged_color, color.w);
 }
 
-fn is_in_shadow(world_pos: vec3<f32>) -> bool {
-    let world_pos_affine = vec4(world_pos, 1.0);
-    var shadow_view_pos = globals.shadow_map_projection * world_pos_affine;
-    shadow_view_pos.z /= shadow_view_pos.w;
+// 0.0 -> Shadow
+// 1.0 -> Lit
+fn get_light_factor_from_sun(world_pos: vec3<f32>) -> f32 {
+    let shadow_clip = globals.shadow_map_projection * vec4(world_pos, 1.0);
+    let ndc = shadow_clip.xyz / shadow_clip.w;
+    // [-1, 1] -> [0, 1]
+    let uv = ndc.xy * 0.5 + vec2(0.5);
+    let receiver_depth = ndc.z * 0.5 + 0.5;
     if (
-        shadow_view_pos.x < -1.
-        || shadow_view_pos.x > 1.
-        || shadow_view_pos.y < -1.
-        || shadow_view_pos.y > 1.
+        uv.x < 0. || uv.x > 1. ||
+        uv.y < 0. || uv.y > 1. ||
+        receiver_depth < 0. ||
+        receiver_depth > 1.
     ) {
-        // Outside of the orthographic view of the shadow map
-        return false;
+        return 1.0;
     }
-    // [-1,1] -> [0,1]
-    let uv = (shadow_view_pos.xy * 0.5) + vec2(0.5);
-    let sample_depth = shadow_view_pos.z;
-    let shadow_caster_depth = textureSample(
+    let lit = textureSampleCompare(
         shadow_map,
         shadow_map_sampler,
         uv,
+        receiver_depth
     );
-    return sample_depth < (shadow_caster_depth - 1e-6);
+    return lit;
 }
