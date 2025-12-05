@@ -103,7 +103,7 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
         }
         default: {
             sunlight_factor = get_sunlight_factor(vertex.world_pos);
-            if sunlight_factor < 0.01 {
+            if sunlight_factor < 0.0001 {
                 return vec4(1., 0., 0., 1.);
             }
             texture_color = textureSample(
@@ -112,6 +112,11 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
                 vertex.uv,
                 vertex.material_index
             );
+            // texture_color = vec4(textureSample(
+            //     shadow_map,
+            //     my_sampler,
+            //     vertex.uv,
+            // ) * vec3(1., 1., 1.), 1.);
         }
     }
     // let texture_color = textureSample(
@@ -162,7 +167,7 @@ fn get_sunlight_factor(world_pos: vec3<f32>) -> f32 {
     let shadow_clip = globals.shadow_map_projection * vec4(world_pos, 1.0);
     let ndc = shadow_clip.xyz / shadow_clip.w;
     // [-1, 1] -> [0, 1]
-    let uv = ndc.xy * 0.5 + vec2(0.5);
+    let uv = (ndc.xy * 0.5 + vec2(0.5));
     let receiver_depth = ndc.z;
     if (
         uv.x < 0.
@@ -178,7 +183,7 @@ fn get_sunlight_factor(world_pos: vec3<f32>) -> f32 {
         shadow_map,
         shadow_map_sampler,
         uv,
-        receiver_depth
+        receiver_depth + 0.007
     );
     return 1.0 - lit;
 }
