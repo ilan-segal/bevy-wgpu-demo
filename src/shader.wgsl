@@ -8,6 +8,7 @@ struct Globals {
     fog_color: vec3<f32>,
     fog_b: f32,
     shadow_map_projection: mat4x4<f32>,
+    shadow_ndc_display_mode: u32,
 }
 
 @group(0) @binding(0)
@@ -76,13 +77,50 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    let texture_color = textureSample(
-        my_texture,
-        my_sampler,
-        vertex.uv,
-        vertex.material_index
-    );
-    let sunlight_factor = get_light_factor_from_sun(vertex.world_pos);
+    var texture_color: vec4<f32>;
+    var sunlight_factor: f32 = 1.0;
+    let red = vec3(1., 0., 0.);
+    let green = vec3(0., 1., 0.);
+    let val = get_ndc_coordinates(vertex.world_pos);
+    switch globals.shadow_ndc_display_mode {
+        case 1u: {
+            texture_color = vec4(lerp_colours(red, green, -1., 1., val.x), 1.0);
+            if (val.y < -1. || val.y > 1. || val.z < 0. || val.z > 1.) {
+                texture_color = vec4(0., 0., 0., 1.);
+            }
+        }
+        case 2u: {
+            texture_color = vec4(lerp_colours(red, green, -1., 1., val.y), 1.0);
+            if (val.x < -1. || val.x > 1. || val.z < 0. || val.z > 1.) {
+                texture_color = vec4(0., 0., 0., 1.);
+            }
+        }
+        case 3u: {
+            texture_color = vec4(lerp_colours(red, green, 0., 1., val.z), 1.0);
+            if (val.x < -1. || val.x > 1. || val.y < -1. || val.y > 1.) {
+                texture_color = vec4(0., 0., 0., 1.);
+            }
+        }
+        default: {
+            sunlight_factor = get_sunlight_factor(vertex.world_pos);
+            if sunlight_factor < 0.01 {
+                return vec4(1., 0., 0., 1.);
+            }
+            texture_color = textureSample(
+                my_texture,
+                my_sampler,
+                vertex.uv,
+                vertex.material_index
+            );
+        }
+    }
+    // let texture_color = textureSample(
+    //     my_texture,
+    //     my_sampler,
+    //     vertex.uv,
+    //     vertex.material_index
+    // );
+    // let sunlight_factor = get_light_factor_from_sun(vertex.world_pos);
     // return vec4(sunlight_factor, sunlight_factor, sunlight_factor, 1.0);
     let directional_illumination = (
         sunlight_factor
@@ -102,19 +140,37 @@ fn fog_color(color: vec4<f32>, distance: f32) -> vec4<f32> {
     return vec4(fogged_color, color.w);
 }
 
+fn lerp_colours(a: vec3<f32>, b: vec3<f32>, x0: f32, x1: f32, x: f32) -> vec3<f32> {
+    let t = (x - x0) / (x1 - x0);
+    if t < 0. || t > 1. {
+        return vec3(0., 0., 0.);
+    }
+    return ((1.0 - t) * a) + (t * b);
+}
+
 // 0.0 -> Shadow
 // 1.0 -> Lit
-fn get_light_factor_from_sun(world_pos: vec3<f32>) -> f32 {
+fn get_ndc_coordinates(world_pos: vec3<f32>) -> vec3<f32> {
+    let shadow_clip = globals.shadow_map_projection * vec4(world_pos, 1.0);
+    let ndc = shadow_clip.xyz / shadow_clip.w;
+    return ndc;
+}
+
+// 0.0 -> Shadow
+// 1.0 -> Lit
+fn get_sunlight_factor(world_pos: vec3<f32>) -> f32 {
     let shadow_clip = globals.shadow_map_projection * vec4(world_pos, 1.0);
     let ndc = shadow_clip.xyz / shadow_clip.w;
     // [-1, 1] -> [0, 1]
     let uv = ndc.xy * 0.5 + vec2(0.5);
-    let receiver_depth = ndc.z * 0.5 + 0.5;
+    let receiver_depth = ndc.z;
     if (
-        uv.x < 0. || uv.x > 1. ||
-        uv.y < 0. || uv.y > 1. ||
-        receiver_depth < 0. ||
-        receiver_depth > 1.
+        uv.x < 0.
+        || uv.x > 1.
+        || uv.y < 0.
+        || uv.y > 1.
+        || receiver_depth < 0.
+        || receiver_depth > 1.
     ) {
         return 1.0;
     }
