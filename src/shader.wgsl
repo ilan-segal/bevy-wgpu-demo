@@ -8,7 +8,6 @@ struct Globals {
     fog_color: vec3<f32>,
     fog_b: f32,
     shadow_map_projection: mat4x4<f32>,
-    shadow_ndc_display_mode: u32,
 }
 
 @group(0) @binding(0)
@@ -77,56 +76,13 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 
 @fragment
 fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
-    var texture_color: vec4<f32>;
-    var sunlight_factor: f32 = 1.0;
-    let red = vec3(1., 0., 0.);
-    let green = vec3(0., 1., 0.);
-    let val = get_ndc_coordinates(vertex.world_pos);
-    switch globals.shadow_ndc_display_mode {
-        case 1u: {
-            texture_color = vec4(lerp_colours(red, green, -1., 1., val.x), 1.0);
-            if (val.y < -1. || val.y > 1. || val.z < 0. || val.z > 1.) {
-                texture_color = vec4(0., 0., 0., 1.);
-            }
-        }
-        case 2u: {
-            texture_color = vec4(lerp_colours(red, green, -1., 1., val.y), 1.0);
-            if (val.x < -1. || val.x > 1. || val.z < 0. || val.z > 1.) {
-                texture_color = vec4(0., 0., 0., 1.);
-            }
-        }
-        case 3u: {
-            texture_color = vec4(lerp_colours(red, green, 0., 1., val.z), 1.0);
-            if (val.x < -1. || val.x > 1. || val.y < -1. || val.y > 1.) {
-                texture_color = vec4(0., 0., 0., 1.);
-            }
-        }
-        default: {
-            sunlight_factor = get_sunlight_factor(vertex.world_pos);
-            if sunlight_factor < 0.0001 {
-                return vec4(1., 0., 0., 1.);
-            }
-            texture_color = textureSample(
-                my_texture,
-                my_sampler,
-                vertex.uv,
-                vertex.material_index
-            );
-            // texture_color = vec4(textureSample(
-            //     shadow_map,
-            //     my_sampler,
-            //     vertex.uv,
-            // ) * vec3(1., 1., 1.), 1.);
-        }
-    }
-    // let texture_color = textureSample(
-    //     my_texture,
-    //     my_sampler,
-    //     vertex.uv,
-    //     vertex.material_index
-    // );
-    // let sunlight_factor = get_light_factor_from_sun(vertex.world_pos);
-    // return vec4(sunlight_factor, sunlight_factor, sunlight_factor, 1.0);
+    let sunlight_factor = get_sunlight_factor(vertex.world_pos);
+    let texture_color = textureSample(
+        my_texture,
+        my_sampler,
+        vertex.uv,
+        vertex.material_index
+    );
     let directional_illumination = (
         sunlight_factor
         * max(0.0, dot(vertex.normal, globals.directional_light_direction))
@@ -167,7 +123,7 @@ fn get_sunlight_factor(world_pos: vec3<f32>) -> f32 {
     let shadow_clip = globals.shadow_map_projection * vec4(world_pos, 1.0);
     let ndc = shadow_clip.xyz / shadow_clip.w;
     // [-1, 1] -> [0, 1]
-    let uv = (ndc.xy * 0.5 + vec2(0.5));
+    let uv = vec2(ndc.x, -ndc.y) * 0.5 + vec2(0.5);
     let receiver_depth = ndc.z;
     if (
         uv.x < 0.
@@ -183,7 +139,7 @@ fn get_sunlight_factor(world_pos: vec3<f32>) -> f32 {
         shadow_map,
         shadow_map_sampler,
         uv,
-        receiver_depth + 0.007
+        receiver_depth + 2e-4
     );
-    return 1.0 - lit;
+    return lit;
 }
