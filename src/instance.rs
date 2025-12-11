@@ -42,23 +42,30 @@ use bevy::render::{mesh::VertexFormat, render_resource::VertexAttribute};
 // }
 
 pub struct DetailedInstance {
-    pub texture_index: usize,
+    pub texture_index: u32,
     pub transform: bevy::prelude::Transform,
+    /// Column-wise, starting with top right
+    pub ambient_occlusion: [u8; 4],
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct DetailedInstanceRaw {
-    matrix_cols: [[f32; 4]; 4],
-    texture_index: usize,
+    transform: [[f32; 4]; 4],
+    /// Bits:
+    /// - 0-11: Ambient occlusion factors (3 bits each, 4 values, 0-4)
+    /// - 12-31: Texture index
+    data: u32,
 }
 
 impl From<DetailedInstance> for DetailedInstanceRaw {
     fn from(value: DetailedInstance) -> Self {
         let matrix_cols = value.transform.compute_matrix().to_cols_array_2d();
+        let [a0, a1, a2, a3] = value.ambient_occlusion.map(|x| x as u32);
+        let ambient_occlusions = (a0 << 0) | (a1 << 3) | (a2 << 6) | (a3 << 9);
         Self {
-            matrix_cols,
-            texture_index: value.texture_index,
+            transform: matrix_cols,
+            data: (ambient_occlusions << 0) | (value.texture_index << 12),
         }
     }
 }

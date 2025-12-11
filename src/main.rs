@@ -80,7 +80,7 @@ fn main() {
         .insert_resource(AmbientLight(AMBIENT_LIGHT))
         .insert_resource(DirectionalLight {
             color: Color::srgb(0.75, 0.75, 0.75),
-            direction: Dir3::new(Vec3::new(1.0, -1.0, 1.0))
+            direction: Dir3::new(Vec3::new(0.5, -0.75, 2.0))
                 .expect("Non-zero light direction vector"),
         })
         .insert_resource(FogSettings {
@@ -843,6 +843,7 @@ fn create_instance(quad: &Quad, chunk_position: &ChunkPosition) -> DetailedInsta
             .get_texture_index()
             .expect("quad should have texture-able block")
             .index,
+        ambient_occlusion: quad.ambient_occlusion,
     }
 }
 

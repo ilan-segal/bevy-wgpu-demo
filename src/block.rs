@@ -33,6 +33,6 @@ impl Block {
 }
 
 pub struct TextureIndex {
-    pub index: usize,
+    pub index: u32,
     pub asset_path: &'static str,
 }

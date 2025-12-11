@@ -33,6 +33,8 @@ pub struct Quad {
     pub width: NonZero<u32>,
     pub height: NonZero<u32>,
     pub pos: IVec3,
+    /// Column-wise, starting with top right
+    pub ambient_occlusion: [u8; 4],
 }
 
 #[derive(Resource, Default)]
@@ -129,8 +131,8 @@ fn get_quad_on_face(blocks: &Neighborhood<Blocks>, pos: [i32; 3], normal: &Norma
         .at_pos(&pos)
         .filter(|block| block != &&Block::Air)
         .cloned()?;
-    let posv = IVec3::from(pos);
-    let other_pos = posv + normal.as_unit_direction();
+    let pos = IVec3::from(pos);
+    let other_pos = pos + normal.as_unit_direction();
     let other_block = blocks
         .at_pos(&other_pos.into())
         .cloned()
@@ -143,7 +145,63 @@ fn get_quad_on_face(blocks: &Neighborhood<Blocks>, pos: [i32; 3], normal: &Norma
         normal: *normal,
         width: NonZero::new(1).unwrap(),
         height: NonZero::new(1).unwrap(),
-        pos: pos.into(),
+        pos,
+        ambient_occlusion: [0, 1, 2, 3]
+            .map(|idx| get_ambient_occlusion_factor(blocks, pos, normal, idx)),
     };
     return Some(quad);
+}
+
+fn get_ambient_occlusion_factor(
+    blocks: &Neighborhood<Blocks>,
+    pos: IVec3,
+    normal: &Normal,
+    corner_index: u8,
+) -> u8 {
+    let (a0, a1) = get_perpendicular_axes(normal);
+    let one_layer_up = normal.as_unit_direction() + pos;
+    let offset_0 = a0.as_unit_direction()
+        * match corner_index {
+            0 | 1 => -1,
+            _ => 1,
+        };
+    let offset_1 = a1.as_unit_direction()
+        * match corner_index {
+            0 | 2 => -1,
+            _ => 1,
+        };
+    let is_solid = |p: IVec3| {
+        blocks
+            .at_pos(&p.to_array())
+            .map(|block| !block.is_transparent())
+            .unwrap_or(false)
+    };
+    let left = is_solid(one_layer_up + offset_0);
+    let right = is_solid(one_layer_up + offset_1);
+    let corner = is_solid(one_layer_up + offset_0 + offset_1);
+    if left && right {
+        return 4;
+    }
+    if left || right {
+        if corner {
+            return 3;
+        } else {
+            return 2;
+        }
+    }
+    if corner {
+        return 1;
+    }
+    return 0;
+}
+
+fn get_perpendicular_axes(normal: &Normal) -> (Normal, Normal) {
+    match normal {
+        Normal::PosX => (Normal::NegZ, Normal::NegY),
+        Normal::PosY => (Normal::NegZ, Normal::PosX),
+        Normal::PosZ => (Normal::PosX, Normal::NegY),
+        Normal::NegX => (Normal::PosZ, Normal::NegY),
+        Normal::NegY => (Normal::NegZ, Normal::NegX),
+        Normal::NegZ => (Normal::NegX, Normal::NegY),
+    }
 }

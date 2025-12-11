@@ -36,7 +36,7 @@ struct InstanceInput {
     @location(5) model_matrix_1: vec4<f32>,
     @location(6) model_matrix_2: vec4<f32>,
     @location(7) model_matrix_3: vec4<f32>,
-    @location(8) texture_index: u32,
+    @location(8) data: u32,
 };
 
 struct VertexOutput {
@@ -46,6 +46,7 @@ struct VertexOutput {
     @location(2) normal: vec3<f32>,
     @location(3) uv: vec2<f32>,
     @location(4) world_pos: vec3<f32>,
+    @location(5) ambient_occlusion_factor: f32,
 }
 
 @vertex
@@ -67,9 +68,22 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.color = vec4(in.color, 1.0);
     out.uv = in.uv;
     out.normal = local_normal_to_world * in.normal;
-    out.material_index = instance.texture_index;
     out.world_pos = world_pos.xyz;
+    let a0 = ambient_occlusion_factor(f32((instance.data >> 0) & 7));
+    let a1 = ambient_occlusion_factor(f32((instance.data >> 3) & 7));
+    let a2 = ambient_occlusion_factor(f32((instance.data >> 6) & 7));
+    let a3 = ambient_occlusion_factor(f32((instance.data >> 9) & 7));
+    out.ambient_occlusion_factor = bilerp(a0, a2, a1, a3, in.uv.x, in.uv.y);
+    out.material_index = instance.data >> 12;
     return out;
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    return ((1.0 - t) * a) + (t * b);
+}
+
+fn bilerp(a: f32, b: f32, c: f32, d: f32, t0: f32, t1: f32) -> f32 {
+    return lerp(lerp(a, b, t0), lerp(c, d, t0), t1);
 }
 
 // Fragment shader
@@ -89,7 +103,12 @@ fn fs_main(vertex: VertexOutput) -> @location(0) vec4<f32> {
         * globals.directional_light
     );
     let light = globals.ambient_light + directional_illumination;
-    let illuminated_color = vertex.color * texture_color * vec4(light, 1.0);
+    let ao = vertex.ambient_occlusion_factor;
+    let illuminated_color = (
+        vertex.color
+        * texture_color
+        * vec4(light * ao, 1.0)
+    );
     let camera_distance = distance(globals.camera_position, vertex.world_pos);
     let color = fog_color(illuminated_color, camera_distance);
     return color;
@@ -101,20 +120,9 @@ fn fog_color(color: vec4<f32>, distance: f32) -> vec4<f32> {
     return vec4(fogged_color, color.w);
 }
 
-fn lerp_colours(a: vec3<f32>, b: vec3<f32>, x0: f32, x1: f32, x: f32) -> vec3<f32> {
-    let t = (x - x0) / (x1 - x0);
-    if t < 0. || t > 1. {
-        return vec3(0., 0., 0.);
-    }
-    return ((1.0 - t) * a) + (t * b);
-}
-
-// 0.0 -> Shadow
-// 1.0 -> Lit
-fn get_ndc_coordinates(world_pos: vec3<f32>) -> vec3<f32> {
-    let shadow_clip = globals.shadow_map_projection * vec4(world_pos, 1.0);
-    let ndc = shadow_clip.xyz / shadow_clip.w;
-    return ndc;
+fn ambient_occlusion_factor(ambient_occlusion_factor: f32) -> f32 {
+    let strength = 0.5;
+    return exp(-ambient_occlusion_factor * strength);
 }
 
 // 0.0 -> Shadow
@@ -139,7 +147,7 @@ fn get_sunlight_factor(world_pos: vec3<f32>) -> f32 {
         shadow_map,
         shadow_map_sampler,
         uv,
-        receiver_depth + 2e-4
+        receiver_depth + 1e-3
     );
     return lit;
 }

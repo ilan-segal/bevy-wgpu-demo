@@ -120,8 +120,6 @@ fn assign_blocks(
                 }
             })
             .collect();
-        commands
-            .entity(item.entity)
-            .try_insert(Blocks(blocks));
+        commands.entity(item.entity).try_insert(Blocks(blocks));
     }
 }
