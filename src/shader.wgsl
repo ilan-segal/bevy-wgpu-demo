@@ -17,7 +17,7 @@ var my_texture: texture_2d_array<f32>;
 @group(1) @binding(1)
 var my_sampler: sampler;
 @group(2) @binding(0)
-var shadow_map: texture_depth_2d;
+var shadow_map: texture_depth_2d_array;
 @group(2) @binding(1)
 var shadow_map_sampler: sampler_comparison;
 
@@ -147,7 +147,8 @@ fn get_sunlight_factor(world_pos: vec3<f32>) -> f32 {
         shadow_map,
         shadow_map_sampler,
         uv,
-        receiver_depth + 1e-3
+        0,
+        receiver_depth + 1e-5
     );
     return lit;
 }

@@ -424,7 +424,7 @@ fn init_pipeline(
         window.physical_width(),
         window.physical_height(),
     );
-    const SHADOW_MAP_SIZE: u32 = 4096;
+    const SHADOW_MAP_SIZE: u32 = 2048;
     let shadow_map = create_depth_texture(
         "shadow map",
         &render_device,
@@ -572,7 +572,7 @@ fn init_pipeline(
                 visibility: ShaderStages::FRAGMENT,
                 ty: BindingType::Texture {
                     sample_type: TextureSampleType::Depth,
-                    view_dimension: TextureViewDimension::D2,
+                    view_dimension: TextureViewDimension::D2Array,
                     multisampled: false,
                 },
                 count: None,
@@ -699,7 +699,10 @@ fn create_depth_texture(
     };
 
     let texture = device.create_texture(&desc);
-    let view = texture.create_view(&TextureViewDescriptor::default());
+    let view = texture.create_view(&TextureViewDescriptor {
+        dimension: Some(TextureViewDimension::D2Array),
+        ..Default::default()
+    });
 
     DepthTexture {
         view,
@@ -876,7 +879,8 @@ impl ViewNode for MyRenderNode {
         if let Some(directional_light) = world.get_resource::<DirectionalLight>() {
             globals.directional_light = directional_light.color.to_srgba().to_f32_array_no_alpha();
             globals.directional_light_direction = directional_light.direction.to_array();
-            const SHADOW_SIZE: f32 = 128.0;
+            const SHADOW_SIZE: f32 = 16.0;
+            const MAX_SHADOW_LENGTH: f32 = 5000.;
             const NEGATIVE_Z: Mat4 = Mat4::from_cols_array_2d(&[
                 [1., 0., 0., 0.],
                 [0., 1., 0., 0.],
@@ -889,10 +893,10 @@ impl ViewNode for MyRenderNode {
                     SHADOW_SIZE,
                     -SHADOW_SIZE,
                     SHADOW_SIZE,
-                    -SHADOW_SIZE * 2.,
-                    SHADOW_SIZE * 2.,
+                    -MAX_SHADOW_LENGTH * 0.5,
+                    MAX_SHADOW_LENGTH * 0.5,
                 )
-                * Transform::from_translation(Vec3::ZERO)
+                * Transform::from_translation(*camera_position)
                     .looking_to(directional_light.direction, Vec3::Y)
                     .compute_matrix()
                     .inverse();
