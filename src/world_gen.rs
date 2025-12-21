@@ -6,7 +6,8 @@ use lib_chunk::{ChunkPosition, NeighborhoodPlugin};
 use lib_noise::FractalNoise;
 use lib_spatial::{CHUNK_SIZE, SpatiallyMapped};
 use lib_spatial_macro::{SpatiallyMapped2d, SpatiallyMapped3d};
-use lib_utils::{cube_iter, square_iter};
+use lib_utils::cube_iter;
+use ndarray::{Array2, Array3};
 use noise::NoiseFn;
 
 use crate::block::Block;
@@ -56,15 +57,14 @@ fn init_height_noise_generator(mut commands: Commands, world_seed: Res<WorldSeed
 pub struct Chunk;
 
 #[derive(Component, Clone, SpatiallyMapped2d)]
-struct HeightNoise(Vec<f64>);
+struct HeightNoise(Array2<f32>);
 
 impl HeightNoise {
     fn from_noise(chunk_position: ChunkPosition, noise: FractalNoise) -> Self {
         let offset = chunk_position.0 * CHUNK_SIZE as i32;
-        let values = square_iter(0..CHUNK_SIZE as i32)
-            .map(|(x, z)| [x + offset.x, z + offset.z])
-            .map(|point| noise.get(point))
-            .collect();
+        let values = Array2::from_shape_fn((CHUNK_SIZE, CHUNK_SIZE), |(x, z)| {
+            noise.get([x as i32 + offset.x, z as i32 + offset.z]) as f32
+        });
         Self(values)
     }
 }
@@ -98,19 +98,22 @@ struct BlockGenerationData {
 }
 
 #[derive(Component, Clone, SpatiallyMapped3d)]
-pub struct Blocks(Vec<Block>);
+pub struct Blocks(Array3<Block>);
 
 fn assign_blocks(
     mut commands: Commands,
     q_chunks: Query<BlockGenerationData, (With<Chunk>, Without<Blocks>)>,
 ) {
-    const WORLD_AMPLITUDE: f64 = 10.;
+    const WORLD_AMPLITUDE: f32 = 10.;
     for item in q_chunks.iter() {
         let chunk_y = item.chunk_position.0.y * CHUNK_SIZE as i32;
-        let blocks = cube_iter(0..CHUNK_SIZE)
-            .map(|(x, y, z)| {
-                let height_sample = *item.height_noise.at_pos([x, z]);
-                let true_y = (y as i32 + chunk_y) as f64;
+        let blocks = Array3::from_shape_fn(
+            (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE),
+            |(local_x, local_y, local_z)| {
+                let height_sample = *item
+                    .height_noise
+                    .at_pos([local_x, local_z]);
+                let true_y = (local_y as i32 + chunk_y) as f32;
                 if true_y + 1. < height_sample * WORLD_AMPLITUDE {
                     Block::Stone
                 } else if true_y < height_sample * WORLD_AMPLITUDE {
@@ -118,8 +121,10 @@ fn assign_blocks(
                 } else {
                     Block::Air
                 }
-            })
-            .collect();
-        commands.entity(item.entity).try_insert(Blocks(blocks));
+            },
+        );
+        commands
+            .entity(item.entity)
+            .try_insert(Blocks(blocks));
     }
 }
