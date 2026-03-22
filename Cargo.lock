@@ -313,6 +313,7 @@ dependencies = [
  "lib_chunk",
  "lib_first_person_camera",
  "lib_noise",
+ "lib_render",
  "lib_spatial",
  "lib_spatial_macro",
  "lib_utils",
@@ -2665,6 +2666,14 @@ name = "lib_noise"
 version = "0.1.0"
 dependencies = [
  "noise",
+]
+
+[[package]]
+name = "lib_render"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "strum 0.27.2",
 ]
 
 [[package]]
