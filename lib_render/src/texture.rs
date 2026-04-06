@@ -45,21 +45,38 @@ struct TerrainColorTextureHandles {
     handles: Vec<Handle<Image>>,
 }
 
+#[derive(Resource)]
+pub struct TerrainColorTextureIndices {
+    indices_by_name: std::collections::HashMap<&'static str, usize>,
+}
+
+impl TerrainColorTextureIndices {
+    pub fn get_index<T: TextureIndex>(&self, terrain_type: &T) -> Option<&usize> {
+        let name = terrain_type.get_name();
+        self.indices_by_name.get(name)
+    }
+}
+
 fn load_terrain_colors<TerrainType: 'static + IntoEnumIterator + TextureIndex + Send + Sync>(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
     let handles = TerrainType::iter()
         .map(|t| t.get_name())
-        .map(|name| asset_server.load(name))
+        .map(|name| asset_server.load(format!("{name}.png")))
         .collect();
     commands.insert_resource(TerrainColorTextureHandles { handles });
+    let indices_by_name = TerrainType::iter()
+        .enumerate()
+        .map(|(i, ty)| (ty.get_name(), i))
+        .collect();
+    commands.insert_resource(TerrainColorTextureIndices { indices_by_name });
 }
 
 #[derive(Resource)]
-struct TextureBindGroup {
-    bind_group: bevy::render::render_resource::BindGroup,
-    layout: bevy::render::render_resource::BindGroupLayout,
+pub(crate) struct TextureBindGroup {
+    pub bind_group: bevy::render::render_resource::BindGroup,
+    pub layout: bevy::render::render_resource::BindGroupLayout,
 }
 
 fn prepare_texture_bind_group<TerrainType: Send + Sync + TextureIndex>(

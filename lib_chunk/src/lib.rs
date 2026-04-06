@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use lib_spatial::{CHUNK_SIZE, SpatiallyMapped};
 use lib_utils::cube_iter;
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, Debug)]
 pub struct ChunkPosition(pub IVec3);
 
 impl From<IVec3> for ChunkPosition {

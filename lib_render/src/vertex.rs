@@ -1,12 +1,19 @@
-use bevy::render::{mesh::VertexFormat, render_resource::VertexAttribute};
+use bevy::{
+    prelude::*,
+    render::{
+        mesh::VertexFormat,
+        render_resource::{BufferDescriptor, BufferUsages, VertexAttribute},
+        renderer::{RenderDevice, RenderQueue},
+    },
+};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct ModelVertex {
-    pub position: [f32; 3],
-    pub normal: [f32; 3],
-    pub color: [f32; 3],
-    pub uv: [f32; 2],
+pub(crate) struct ModelVertex {
+    position: [f32; 3],
+    normal: [f32; 3],
+    color: [f32; 3],
+    uv: [f32; 2],
 }
 
 impl ModelVertex {
@@ -36,7 +43,7 @@ impl ModelVertex {
     }
 }
 
-pub const VERTICES: &[ModelVertex] = &[
+pub(crate) const VERTICES: &[ModelVertex] = &[
     ModelVertex {
         position: [-0.5, 0.5, 0.5],
         normal: [0.0, 0.0, -1.0],
@@ -64,4 +71,39 @@ pub const VERTICES: &[ModelVertex] = &[
 ];
 
 /// Triangle strip of a single rectangle
-pub const INDICES: &[u16] = &[0, 1, 2, 3];
+pub(crate) const INDICES: &[u16] = &[0, 1, 2, 3];
+
+#[derive(Resource)]
+pub(crate) struct VertexBuffer {
+    pub vertex_buffer: bevy::render::render_resource::Buffer,
+    pub num_vertices: u32,
+}
+
+pub(crate) struct VertexPlugin;
+
+impl Plugin for VertexPlugin {
+    fn build(&self, app: &mut App) {
+        app.sub_app_mut(bevy::render::RenderApp).add_systems(
+            ExtractSchedule,
+            init_vertex_buffer.run_if(not(resource_exists::<VertexBuffer>)),
+        );
+    }
+}
+
+fn init_vertex_buffer(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+) {
+    let vertex_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("triangle vertex buffer"),
+        size: (VERTICES.len() * std::mem::size_of::<ModelVertex>()) as u64,
+        usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    render_queue.write_buffer(&vertex_buffer, 0, bytemuck::cast_slice(VERTICES));
+    commands.insert_resource(VertexBuffer {
+        vertex_buffer,
+        num_vertices: VERTICES.len() as _,
+    });
+}

@@ -15,24 +15,30 @@ impl Block {
             _ => false,
         }
     }
+}
 
-    pub fn get_texture_index(&self) -> Option<TextureIndex> {
-        let result = match self {
-            Self::Stone => TextureIndex {
-                index: 0,
-                asset_path: "stone.png",
-            },
-            Self::Dirt => TextureIndex {
-                index: 1,
-                asset_path: "dirt.png",
-            },
-            _ => return None,
-        };
-        return Some(result);
+#[derive(EnumIter, Clone)]
+pub enum Terrain {
+    Stone,
+    Dirt,
+}
+
+impl lib_render::texture::TextureIndex for Terrain {
+    fn get_name(&self) -> &'static str {
+        match self {
+            Self::Stone => "stone",
+            Self::Dirt => "dirt",
+        }
     }
 }
 
-pub struct TextureIndex {
-    pub index: u32,
-    pub asset_path: &'static str,
+impl TryFrom<Block> for Terrain {
+    type Error = &'static str;
+    fn try_from(value: Block) -> Result<Self, Self::Error> {
+        match value {
+            Block::Air => Err("Air is not terrain"),
+            Block::Dirt => Ok(Self::Dirt),
+            Block::Stone => Ok(Self::Stone),
+        }
+    }
 }

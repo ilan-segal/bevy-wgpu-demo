@@ -6,10 +6,11 @@ use lib_chunk::Neighborhood;
 use lib_utils::cube_iter;
 
 use crate::{
-    block::Block,
-    normal::Normal,
+    block::Terrain,
     world_gen::{Blocks, Chunk},
 };
+
+use lib_render::Normal;
 
 pub struct WorldMeshPlugin;
 
@@ -20,30 +21,20 @@ impl Plugin for WorldMeshPlugin {
             .add_observer(update_quad_count_for_despawn)
             .add_observer(update_quad_count_for_replace)
             .add_observer(update_quad_count_for_insert)
-            .add_plugins(AsyncComponentPlugin::<Quads>::new());
+            .add_plugins(AsyncComponentPlugin::<TerrainQuads>::new());
     }
 }
 
-#[derive(Component)]
-pub struct Quads(pub Vec<Quad>);
-
-pub struct Quad {
-    pub block: Block,
-    pub normal: Normal,
-    pub width: NonZero<u32>,
-    pub height: NonZero<u32>,
-    pub pos: IVec3,
-    /// Column-wise, starting with top right
-    pub ambient_occlusion: [u8; 4],
-}
+type TerrainQuads = lib_render::Quads<Terrain>;
+type TerrainQuad = lib_render::Quad<Terrain>;
 
 #[derive(Resource, Default)]
 pub struct QuadCount(pub u32);
 
 fn update_quad_count_for_despawn(
-    trigger: Trigger<OnRemove, Quads>,
+    trigger: Trigger<OnRemove, TerrainQuads>,
     mut count: ResMut<QuadCount>,
-    q_quads: Query<&Quads>,
+    q_quads: Query<&TerrainQuads>,
 ) {
     let entity = trigger.target();
     let Ok(quads) = q_quads.get(entity) else {
@@ -53,9 +44,9 @@ fn update_quad_count_for_despawn(
 }
 
 fn update_quad_count_for_replace(
-    trigger: Trigger<OnReplace, Quads>,
+    trigger: Trigger<OnReplace, TerrainQuads>,
     mut count: ResMut<QuadCount>,
-    q_quads: Query<&Quads>,
+    q_quads: Query<&TerrainQuads>,
 ) {
     let entity = trigger.target();
     let Ok(quads) = q_quads.get(entity) else {
@@ -65,9 +56,9 @@ fn update_quad_count_for_replace(
 }
 
 fn update_quad_count_for_insert(
-    trigger: Trigger<OnInsert, Quads>,
+    trigger: Trigger<OnInsert, TerrainQuads>,
     mut count: ResMut<QuadCount>,
-    q_quads: Query<&Quads>,
+    q_quads: Query<&TerrainQuads>,
 ) {
     let entity = trigger.target();
     let Ok(quads) = q_quads.get(entity) else {
@@ -87,7 +78,7 @@ fn assign_quads(
         (Entity, &Neighborhood<Blocks>),
         (With<Chunk>, Changed<Neighborhood<Blocks>>),
     >,
-    mut compute_tasks: ResMut<ComputeTasks<Quads>>,
+    mut compute_tasks: ResMut<ComputeTasks<TerrainQuads>>,
 ) {
     for (entity, blocks) in q_unmeshed_chunks.iter() {
         let blocks = blocks.clone();
@@ -96,14 +87,14 @@ fn assign_quads(
     }
 }
 
-fn get_quads(blocks: Neighborhood<Blocks>, meshing_type: MeshingType) -> Quads {
+fn get_quads(blocks: Neighborhood<Blocks>, meshing_type: MeshingType) -> TerrainQuads {
     let quads = match meshing_type {
         MeshingType::Naive => get_quads_naive(&blocks),
     };
-    Quads(quads)
+    lib_render::Quads(quads)
 }
 
-fn get_quads_naive(blocks: &Neighborhood<Blocks>) -> Vec<Quad> {
+fn get_quads_naive(blocks: &Neighborhood<Blocks>) -> Vec<TerrainQuad> {
     cube_iter(0..32)
         .map(|(x, y, z)| [x, y, z])
         .flat_map(|pos| get_quads_around_block(blocks, pos))
@@ -113,7 +104,7 @@ fn get_quads_naive(blocks: &Neighborhood<Blocks>) -> Vec<Quad> {
 fn get_quads_around_block(
     blocks: &Neighborhood<Blocks>,
     pos: [i32; 3],
-) -> impl Iterator<Item = Quad> {
+) -> impl Iterator<Item = TerrainQuad> {
     [
         Normal::PosX,
         Normal::NegX,
@@ -126,11 +117,15 @@ fn get_quads_around_block(
     .filter_map(move |normal| get_quad_on_face(blocks, pos, normal))
 }
 
-fn get_quad_on_face(blocks: &Neighborhood<Blocks>, pos: [i32; 3], normal: &Normal) -> Option<Quad> {
-    let block = blocks
+fn get_quad_on_face(
+    blocks: &Neighborhood<Blocks>,
+    pos: [i32; 3],
+    normal: &Normal,
+) -> Option<TerrainQuad> {
+    let ty = blocks
         .at_pos(&pos)
-        .filter(|block| block != &&Block::Air)
-        .cloned()?;
+        .map(|block| Terrain::try_from(*block).ok())
+        .flatten()?;
     let pos = IVec3::from(pos);
     let other_pos = pos + normal.as_unit_direction();
     let other_block = blocks
@@ -140,8 +135,8 @@ fn get_quad_on_face(blocks: &Neighborhood<Blocks>, pos: [i32; 3], normal: &Norma
     if !other_block.is_transparent() {
         return None;
     }
-    let quad = Quad {
-        block,
+    let quad = lib_render::Quad {
+        ty,
         normal: *normal,
         width: NonZero::new(1).unwrap(),
         height: NonZero::new(1).unwrap(),
