@@ -58,6 +58,7 @@ pub(crate) struct IndexBuffer {
 pub(crate) struct DepthTexture {
     pub view: TextureView,
     pub format: TextureFormat,
+    #[allow(unused)]
     pub size: UVec2,
 }
 

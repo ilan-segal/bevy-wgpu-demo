@@ -76,6 +76,7 @@ pub(crate) const INDICES: &[u16] = &[0, 1, 2, 3];
 #[derive(Resource)]
 pub(crate) struct VertexBuffer {
     pub vertex_buffer: bevy::render::render_resource::Buffer,
+    #[allow(unused)]
     pub num_vertices: u32,
 }
 
