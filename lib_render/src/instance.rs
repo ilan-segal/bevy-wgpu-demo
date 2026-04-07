@@ -45,7 +45,7 @@ use bevy::{
 //     }
 // }
 
-pub struct DetailedInstance {
+pub struct Instance {
     pub texture_index: u32,
     pub normal: crate::Normal,
     pub local_pos: [u8; 3],
@@ -57,7 +57,7 @@ pub struct DetailedInstance {
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct DetailedInstanceRaw {
+pub struct RawInstance {
     transform: [[f32; 4]; 4],
     /// Bits:
     /// - 0-11: Ambient occlusion factors (3 bits each, 4 values, 0-4)
@@ -65,8 +65,8 @@ pub struct DetailedInstanceRaw {
     data: u32,
 }
 
-impl From<DetailedInstance> for DetailedInstanceRaw {
-    fn from(value: DetailedInstance) -> Self {
+impl From<Instance> for RawInstance {
+    fn from(value: Instance) -> Self {
         let transform = Transform::from_translation(
             Vec3::from(value.local_pos.map(|x| x as f32))
                 + 32.0 * Vec3::from(value.chunk_pos.map(|x| x as f32)),
@@ -83,7 +83,7 @@ impl From<DetailedInstance> for DetailedInstanceRaw {
     }
 }
 
-impl DetailedInstanceRaw {
+impl RawInstance {
     pub fn desc() -> [VertexAttribute; 5] {
         [
             VertexAttribute {

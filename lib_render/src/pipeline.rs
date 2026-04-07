@@ -14,7 +14,7 @@ use bevy::{
 
 use crate::{
     globals::GlobalsData,
-    instance::DetailedInstanceRaw,
+    instance::RawInstance,
     texture::TextureBindGroup,
     vertex::{INDICES, ModelVertex},
 };
@@ -176,9 +176,9 @@ pub(crate) fn init_pipeline(
     };
 
     let instance_layout = bevy::render::render_resource::RawVertexBufferLayout {
-        array_stride: std::mem::size_of::<DetailedInstanceRaw>() as _,
+        array_stride: std::mem::size_of::<RawInstance>() as _,
         step_mode: bevy::render::render_resource::VertexStepMode::Instance,
-        attributes: &DetailedInstanceRaw::desc(),
+        attributes: &RawInstance::desc(),
     };
 
     let index_buffer = render_device.create_buffer_with_data(
