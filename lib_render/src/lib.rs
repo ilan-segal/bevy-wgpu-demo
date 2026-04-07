@@ -206,12 +206,10 @@ fn create_instance<TerrainType: texture::TextureIndex>(
     chunk_position: &TerrainPosition,
     indices: &texture::TerrainColorTextureIndices,
 ) -> instance::DetailedInstance {
-    let transform =
-        Transform::from_translation(quad.pos.as_vec3() + 32.0 * chunk_position.0.as_vec3())
-            .with_scale(Vec3::new(quad.width.get() as _, quad.height.get() as _, 1.))
-            .looking_to(quad.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y);
     instance::DetailedInstance {
-        transform,
+        normal: quad.normal,
+        local_pos: quad.pos.to_array().map(|x| x as _),
+        chunk_pos: chunk_position.0.to_array(),
         texture_index: *indices.get_index(&quad.ty).expect("Terrain texture index") as _,
         ambient_occlusion: quad.ambient_occlusion,
     }

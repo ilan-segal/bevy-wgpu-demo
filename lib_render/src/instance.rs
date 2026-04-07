@@ -1,4 +1,8 @@
-use bevy::render::{mesh::VertexFormat, render_resource::VertexAttribute};
+use bevy::{
+    math::Vec3,
+    render::{mesh::VertexFormat, render_resource::VertexAttribute},
+    transform::components::Transform,
+};
 
 // pub struct Instance {
 //     pub position: UVec3,
@@ -43,7 +47,10 @@ use bevy::render::{mesh::VertexFormat, render_resource::VertexAttribute};
 
 pub struct DetailedInstance {
     pub texture_index: u32,
-    pub transform: bevy::prelude::Transform,
+    pub normal: crate::Normal,
+    pub local_pos: [u8; 3],
+    pub chunk_pos: [i32; 3],
+    // pub transform: bevy::prelude::Transform,
     /// Column-wise, starting with top right
     pub ambient_occlusion: [u8; 4],
 }
@@ -60,7 +67,13 @@ pub struct DetailedInstanceRaw {
 
 impl From<DetailedInstance> for DetailedInstanceRaw {
     fn from(value: DetailedInstance) -> Self {
-        let matrix_cols = value.transform.compute_matrix().to_cols_array_2d();
+        let transform = Transform::from_translation(
+            Vec3::from(value.local_pos.map(|x| x as f32))
+                + 32.0 * Vec3::from(value.chunk_pos.map(|x| x as f32)),
+        )
+        .looking_to(value.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y);
+
+        let matrix_cols = transform.compute_matrix().to_cols_array_2d();
         let [a0, a1, a2, a3] = value.ambient_occlusion.map(|x| x as u32);
         let ambient_occlusions = (a0 << 0) | (a1 << 3) | (a2 << 6) | (a3 << 9);
         Self {
