@@ -76,6 +76,8 @@ fn assign_terrain_position(
 ) {
     for (entity, chunk_pos) in q_chunk.iter() {
         let terrain_position = lib_render::TerrainPosition(chunk_pos.0);
-        commands.entity(entity).try_insert(terrain_position);
+        commands
+            .entity(entity)
+            .try_insert(terrain_position);
     }
 }

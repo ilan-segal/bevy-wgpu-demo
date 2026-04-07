@@ -164,7 +164,7 @@ pub(crate) fn init_pipeline(
         bevy::render::render_resource::ShaderModuleDescriptor {
             label: Some("triangle shader"),
             source: bevy::render::render_resource::ShaderSource::Wgsl(
-                include_str!("shader.wgsl").into(),
+                include_str!("shaders/triangle.wgsl").into(),
             ),
         },
     );
