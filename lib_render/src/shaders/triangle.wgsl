@@ -1,3 +1,42 @@
+const ROTATION_BY_NORMAL = array<mat4x4<f32>, 6>(
+    mat4x4<f32>(
+        vec4<f32>(0.0, 0.0, -1.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    ),
+    mat4x4<f32>(
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(-1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    ),
+    mat4x4<f32>(
+        vec4<f32>(0.0, 0.0, -1.0, 0.0),
+        vec4<f32>(-1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    ),
+    mat4x4<f32>(
+        vec4<f32>(0.0, 0.0, -1.0, 0.0),
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, -1.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    ),
+    mat4x4<f32>(
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    ),
+    mat4x4<f32>(
+        vec4<f32>(-1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, -1.0, 0.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0),
+    ),
+);
+
 struct Globals {
     time_seconds: f32,
     world_to_clip: mat4x4<f32>,
@@ -32,11 +71,12 @@ struct VertexInput {
 }
 
 struct InstanceInput {
-    @location(4) model_matrix_0: vec4<f32>,
-    @location(5) model_matrix_1: vec4<f32>,
-    @location(6) model_matrix_2: vec4<f32>,
-    @location(7) model_matrix_3: vec4<f32>,
-    @location(8) data: u32,
+    @location(4) data: u32,
+    @location(5) chunk_pos: vec3<f32>,
+    // @location(5) model_matrix_0: vec4<f32>,
+    // @location(6) model_matrix_1: vec4<f32>,
+    // @location(7) model_matrix_2: vec4<f32>,
+    // @location(8) model_matrix_3: vec4<f32>,
 };
 
 struct VertexOutput {
@@ -49,18 +89,51 @@ struct VertexOutput {
     @location(5) ambient_occlusion_factor: f32,
 }
 
+fn unpack_local_pos(data: u32) -> vec3<f32> {
+    let x = f32((data >> 0u) & 0x1Fu);
+    let y = f32((data >> 5u) & 0x1Fu);
+    let z = f32((data >> 10u) & 0x1Fu);
+    return vec3<f32>(x, y, z);
+}
+
+fn unpack_normal(data: u32) -> u32 {
+    return (data >> 27u) & 0x7u; // 3 bits for 0–5
+}
+
+fn build_model_matrix(face: InstanceInput) -> mat4x4<f32> {
+    // --- Unpack local block position inside chunk
+    let local_block = unpack_local_pos(face.data);
+
+    // --- Fetch chunk world position
+    // let chunk = chunks[face.chunk_id];
+    let chunk_world = vec3<f32>(face.chunk_pos) * 32.0;
+
+    // --- Compute final block world position
+    let block_world = chunk_world + local_block;
+
+    // --- Select face rotation
+    let normal = unpack_normal(face.data);
+    let rotation = ROTATION_BY_NORMAL[normal];
+
+    // --- Translation matrix for block position
+    let translation = mat4x4<f32>(
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
+        vec4<f32>(block_world, 1.0),
+    );
+
+    // --- Final model matrix
+    return translation * rotation;
+}
+
 @vertex
 fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
-    let local_to_world = mat4x4<f32>(
-        instance.model_matrix_0,
-        instance.model_matrix_1,
-        instance.model_matrix_2,
-        instance.model_matrix_3,
-    );
+    let local_to_world = build_model_matrix(instance);
     let local_normal_to_world = mat3x3<f32>(
-        instance.model_matrix_0.xyz,
-        instance.model_matrix_1.xyz,
-        instance.model_matrix_2.xyz,
+        local_to_world[0].xyz,
+        local_to_world[1].xyz,
+        local_to_world[2].xyz,
     );
     let world_pos = local_to_world * vec4(in.position, 1.0);
     var out: VertexOutput;
@@ -69,12 +142,12 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.uv = in.uv;
     out.normal = local_normal_to_world * in.normal;
     out.world_pos = world_pos.xyz;
-    let a0 = ambient_occlusion_factor(f32((instance.data >> 0) & 7));
-    let a1 = ambient_occlusion_factor(f32((instance.data >> 3) & 7));
-    let a2 = ambient_occlusion_factor(f32((instance.data >> 6) & 7));
-    let a3 = ambient_occlusion_factor(f32((instance.data >> 9) & 7));
+    let a0 = ambient_occlusion_factor(f32((instance.data >> 15) & 7));
+    let a1 = ambient_occlusion_factor(f32((instance.data >> 18) & 7));
+    let a2 = ambient_occlusion_factor(f32((instance.data >> 21) & 7));
+    let a3 = ambient_occlusion_factor(f32((instance.data >> 24) & 7));
     out.ambient_occlusion_factor = bilerp(a0, a2, a1, a3, in.uv.x, in.uv.y);
-    out.material_index = instance.data >> 12;
+    out.material_index = instance.data >> 30;
     return out;
 }
 

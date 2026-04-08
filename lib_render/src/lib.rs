@@ -228,7 +228,7 @@ pub struct Quad<TerrainType> {
     pub ambient_occlusion: [u8; 4],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub enum Normal {
     PosX,

@@ -1,8 +1,4 @@
-use bevy::{
-    math::Vec3,
-    render::{mesh::VertexFormat, render_resource::VertexAttribute},
-    transform::components::Transform,
-};
+use bevy::render::{mesh::VertexFormat, render_resource::VertexAttribute};
 
 // pub struct Instance {
 //     pub position: UVec3,
@@ -58,58 +54,46 @@ pub struct Instance {
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct RawInstance {
-    transform: [[f32; 4]; 4],
     /// Bits:
-    /// - 0-11: Ambient occlusion factors (3 bits each, 4 values, 0-4)
-    /// - 12-31: Texture index
+    /// - 0-4: Local x (5 bits, 0-31)
+    /// - 5-9: Local y (5 bits, 0-31)
+    /// - 10-14: Local z (5 bits, 0-31)
+    /// - 15-26: Ambient occlusion factors (3 bits each, 4 values, 0-4)
+    /// - 27-29: Normal
+    /// - 30-31: Texture index
     data: u32,
+    chunk_pos: [f32; 3],
+    // transform: [[f32; 4]; 4],
 }
 
 impl From<Instance> for RawInstance {
     fn from(value: Instance) -> Self {
-        let transform = Transform::from_translation(
-            Vec3::from(value.local_pos.map(|x| x as f32))
-                + 32.0 * Vec3::from(value.chunk_pos.map(|x| x as f32)),
-        )
-        .looking_to(value.normal.as_unit_direction().as_vec3() * -0.5, Vec3::Y);
-
-        let matrix_cols = transform.compute_matrix().to_cols_array_2d();
         let [a0, a1, a2, a3] = value.ambient_occlusion.map(|x| x as u32);
         let ambient_occlusions = (a0 << 0) | (a1 << 3) | (a2 << 6) | (a3 << 9);
         Self {
-            transform: matrix_cols,
-            data: (ambient_occlusions << 0) | (value.texture_index << 12),
+            data: ((value.local_pos[0] as u32) << 0)
+                | ((value.local_pos[1] as u32) << 5)
+                | ((value.local_pos[2] as u32) << 10)
+                | (ambient_occlusions << 15)
+                | ((value.normal as u32) << 27)
+                | (value.texture_index << 30),
+            chunk_pos: value.chunk_pos.map(|value| value as _),
         }
     }
 }
 
 impl RawInstance {
-    pub fn desc() -> [VertexAttribute; 5] {
+    pub fn desc() -> [VertexAttribute; 2] {
         [
             VertexAttribute {
-                format: VertexFormat::Float32x4,
+                format: VertexFormat::Uint32,
                 offset: 0,
                 shader_location: 4,
             },
             VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: std::mem::size_of::<[f32; 4]>() as _,
+                format: VertexFormat::Float32x3,
+                offset: std::mem::size_of::<[f32; 1]>() as _,
                 shader_location: 5,
-            },
-            VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: std::mem::size_of::<[f32; 8]>() as _,
-                shader_location: 6,
-            },
-            VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: std::mem::size_of::<[f32; 12]>() as _,
-                shader_location: 7,
-            },
-            VertexAttribute {
-                format: VertexFormat::Uint32,
-                offset: std::mem::size_of::<[f32; 16]>() as _,
-                shader_location: 8,
             },
         ]
     }

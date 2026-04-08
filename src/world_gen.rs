@@ -107,24 +107,17 @@ fn assign_blocks(
     const WORLD_AMPLITUDE: f32 = 10.;
     for item in q_chunks.iter() {
         let chunk_y = item.chunk_position.0.y * CHUNK_SIZE as i32;
-        let blocks = Array3::from_shape_fn(
-            (CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE),
-            |(local_x, local_y, local_z)| {
-                let height_sample = *item
-                    .height_noise
-                    .at_pos([local_x, local_z]);
-                let true_y = (local_y as i32 + chunk_y) as f32;
-                if true_y + 1. < height_sample * WORLD_AMPLITUDE {
-                    Block::Stone
-                } else if true_y < height_sample * WORLD_AMPLITUDE {
-                    Block::Dirt
-                } else {
-                    Block::Air
-                }
-            },
-        );
-        commands
-            .entity(item.entity)
-            .try_insert(Blocks(blocks));
+        let blocks = Array3::from_shape_fn((CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE), |(x, y, z)| {
+            let height_sample = *item.height_noise.at_pos([x, z]);
+            let true_y = (y as i32 + chunk_y) as f32;
+            if true_y + 1. < height_sample * WORLD_AMPLITUDE {
+                Block::Stone
+            } else if true_y < height_sample * WORLD_AMPLITUDE {
+                Block::Dirt
+            } else {
+                Block::Air
+            }
+        });
+        commands.entity(item.entity).try_insert(Blocks(blocks));
     }
 }
