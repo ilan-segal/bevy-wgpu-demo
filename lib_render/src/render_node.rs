@@ -162,17 +162,26 @@ impl ViewNode for MyRenderNode {
                 shadow_pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
                 shadow_pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
 
-                for InstanceBuffer {
-                    buffer: instance_buffer,
-                    num_instances,
-                } in world
+                for (
+                    pos,
+                    InstanceBuffer {
+                        buffer: instance_buffer,
+                        num_instances,
+                    },
+                ) in world
                     .resource::<InstanceBuffers>()
                     .chunk_pos_to_buffer
-                    .values()
+                    .iter()
                 {
                     if num_instances == &0 {
                         continue;
                     }
+                    let chunk_pos_array = pos.to_array();
+                    shadow_pass.set_push_constants(
+                        bevy::render::render_resource::ShaderStages::VERTEX,
+                        0, // offset
+                        bytemuck::cast_slice(&[chunk_pos_array]),
+                    );
                     shadow_pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
                     shadow_pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
                 }
@@ -212,17 +221,26 @@ impl ViewNode for MyRenderNode {
                 pass.set_index_buffer(*index_buffer.slice(..).deref(), IndexFormat::Uint16);
                 pass.set_vertex_buffer(0, *vertex_buffer.slice(..).deref());
 
-                for InstanceBuffer {
-                    buffer: instance_buffer,
-                    num_instances,
-                } in world
+                for (
+                    pos,
+                    InstanceBuffer {
+                        buffer: instance_buffer,
+                        num_instances,
+                    },
+                ) in world
                     .resource::<InstanceBuffers>()
                     .chunk_pos_to_buffer
-                    .values()
+                    .iter()
                 {
                     if num_instances == &0 {
                         continue;
                     }
+                    let chunk_pos_array = pos.to_array();
+                    pass.set_push_constants(
+                        bevy::render::render_resource::ShaderStages::VERTEX,
+                        0, // offset
+                        bytemuck::cast_slice(&[chunk_pos_array]),
+                    );
                     pass.set_vertex_buffer(1, *instance_buffer.slice(..).deref());
                     pass.draw_indexed(0..*num_indices, 0, 0..*num_instances);
                 }

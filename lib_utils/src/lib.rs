@@ -7,7 +7,7 @@ where
 {
     it.clone()
         .cartesian_product(it.clone())
-        .cartesian_product(it.clone())
+        .cartesian_product(it)
         .map(|((x, y), z)| (x, y, z))
 }
 

@@ -198,7 +198,10 @@ pub(crate) fn init_pipeline(
         &bevy::render::render_resource::PipelineLayoutDescriptor {
             label: Some("shadow pipeline layout"),
             bind_group_layouts: &[&globals_bind_group_layout],
-            push_constant_ranges: &[],
+            push_constant_ranges: &[bevy::render::render_resource::PushConstantRange {
+                stages: ShaderStages::VERTEX,
+                range: 0..12,
+            }],
         },
     );
 
@@ -290,7 +293,10 @@ pub(crate) fn init_pipeline(
                 &texture_bind_group.layout,
                 &shadow_map_bind_group_layout,
             ],
-            push_constant_ranges: &[],
+            push_constant_ranges: &[bevy::render::render_resource::PushConstantRange {
+                stages: ShaderStages::VERTEX,
+                range: 0..12,
+            }],
         },
     );
 

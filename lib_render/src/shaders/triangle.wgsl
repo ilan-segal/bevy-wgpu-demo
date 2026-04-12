@@ -1,3 +1,9 @@
+var<push_constant> chunk_position: ChunkPosition;
+
+struct ChunkPosition {
+    pos: vec3<i32>,
+}
+
 const ROTATION_BY_NORMAL = array<mat4x4<f32>, 6>(
     mat4x4<f32>(
         vec4<f32>(0.0, 0.0, -1.0, 0.0),
@@ -71,12 +77,14 @@ struct VertexInput {
 }
 
 struct InstanceInput {
+    /// Bits:
+    /// - 0-4: Local x (5 bits, 0-31)
+    /// - 5-9: Local y (5 bits, 0-31)
+    /// - 10-14: Local z (5 bits, 0-31)
+    /// - 15-26: Ambient occlusion factors (3 bits each, 4 values, 0-4)
+    /// - 27-29: Normal
+    /// - 30-31: Texture index
     @location(4) data: u32,
-    @location(5) chunk_pos: vec3<f32>,
-    // @location(5) model_matrix_0: vec4<f32>,
-    // @location(6) model_matrix_1: vec4<f32>,
-    // @location(7) model_matrix_2: vec4<f32>,
-    // @location(8) model_matrix_3: vec4<f32>,
 };
 
 struct VertexOutput {
@@ -106,7 +114,7 @@ fn build_model_matrix(face: InstanceInput) -> mat4x4<f32> {
 
     // --- Fetch chunk world position
     // let chunk = chunks[face.chunk_id];
-    let chunk_world = vec3<f32>(face.chunk_pos) * 32.0;
+    let chunk_world = vec3<f32>(chunk_position.pos) * 32.0;
 
     // --- Compute final block world position
     let block_world = chunk_world + local_block;
@@ -128,7 +136,10 @@ fn build_model_matrix(face: InstanceInput) -> mat4x4<f32> {
 }
 
 @vertex
-fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
+fn vs_main(
+    in: VertexInput,
+    instance: InstanceInput,
+) -> VertexOutput {
     let local_to_world = build_model_matrix(instance);
     let local_normal_to_world = mat3x3<f32>(
         local_to_world[0].xyz,

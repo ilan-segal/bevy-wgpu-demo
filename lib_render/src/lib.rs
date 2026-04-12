@@ -180,7 +180,7 @@ fn update_instance_buffer<TerrainType: Send + Sync + texture::TextureIndex>(
         let instances_raw = quads
             .0
             .iter()
-            .map(|quad| create_instance(quad, chunk_position, indices.as_ref()))
+            .map(|quad| create_instance(quad, indices.as_ref()))
             .map(instance::RawInstance::from)
             .collect::<Vec<_>>();
         let num_instances = instances_raw.len() as u32;
@@ -203,13 +203,13 @@ fn update_instance_buffer<TerrainType: Send + Sync + texture::TextureIndex>(
 
 fn create_instance<TerrainType: texture::TextureIndex>(
     quad: &Quad<TerrainType>,
-    chunk_position: &TerrainPosition,
+    // chunk_position: &TerrainPosition,
     indices: &texture::TerrainColorTextureIndices,
 ) -> instance::Instance {
     instance::Instance {
         normal: quad.normal,
         local_pos: quad.pos.to_array().map(|x| x as _),
-        chunk_pos: chunk_position.0.to_array(),
+        // chunk_pos: chunk_position.0.to_array(),
         texture_index: *indices.get_index(&quad.ty).expect("Terrain texture index") as _,
         ambient_occlusion: quad.ambient_occlusion,
     }
