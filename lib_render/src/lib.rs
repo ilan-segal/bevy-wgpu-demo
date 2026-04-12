@@ -177,6 +177,9 @@ fn update_instance_buffer<TerrainType: Send + Sync + texture::TextureIndex>(
     //     return;
     // };
     for (quads, chunk_position) in q_quads.iter() {
+        if quads.0.is_empty() {
+            continue;
+        }
         let instances_raw = quads
             .0
             .iter()
