@@ -12,6 +12,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     camera::RenderCamera,
+    pipeline::OpaquePass,
     render_node::{MyRenderNode, MyRenderNodeLabel},
 };
 
@@ -56,8 +57,9 @@ impl<TerrainType: 'static + Send + Sync + texture::TextureIndex + IntoEnumIterat
                 ExtractSchedule,
                 (
                     // prepare_texture_bind_group,
-                    pipeline::init_pipeline
-                        .run_if(not(resource_exists::<pipeline::MyRenderPipeline>)),
+                    pipeline::init_pipeline.run_if(not(resource_exists::<
+                        pipeline::MyRenderPipeline<OpaquePass>,
+                    >)),
                     (
                         remove_buffer_for_despawned_terrain,
                         update_instance_buffer::<TerrainType>,
@@ -106,8 +108,10 @@ fn update_camera_data(
             return;
         }
     };
-    let projection_matrix =
-        projection.get_clip_from_view() * camera_transform.compute_matrix().inverse();
+    let projection_matrix = projection.get_clip_from_view()
+        * camera_transform
+            .compute_matrix()
+            .inverse();
     camera_data.projection_matrix = projection_matrix;
     camera_data.position = camera_transform.translation();
 }
@@ -159,7 +163,9 @@ fn remove_buffer_for_despawned_terrain(
     mut instance_buffers: ResMut<InstanceBuffers>,
 ) {
     for TerrainDespawnEvent(TerrainPosition(pos)) in er.read() {
-        instance_buffers.chunk_pos_to_buffer.remove(pos);
+        instance_buffers
+            .chunk_pos_to_buffer
+            .remove(pos);
     }
 }
 
@@ -213,7 +219,9 @@ fn create_instance<TerrainType: texture::TextureIndex>(
         normal: quad.normal,
         local_pos: quad.pos.to_array().map(|x| x as _),
         // chunk_pos: chunk_position.0.to_array(),
-        texture_index: *indices.get_index(&quad.ty).expect("Terrain texture index") as _,
+        texture_index: *indices
+            .get_index(&quad.ty)
+            .expect("Terrain texture index") as _,
         ambient_occlusion: quad.ambient_occlusion,
     }
 }

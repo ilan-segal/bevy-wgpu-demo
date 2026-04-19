@@ -1,10 +1,12 @@
+use std::marker::PhantomData;
+
 use bevy::{
     prelude::*,
     render::{
         Extract,
         render_resource::{
             AddressMode, BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntry,
-            BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor,
+            BindingResource, BindingType, BlendState, Buffer, BufferBindingType, BufferDescriptor,
             BufferUsages, FilterMode, RenderPipeline, ShaderStages, TextureFormat, TextureUsages,
             TextureView,
         },
@@ -19,14 +21,33 @@ use crate::{
     vertex::{INDICES, ModelVertex},
 };
 
-#[derive(Resource)]
-pub struct MyRenderPipeline {
-    pub(crate) pipeline: RenderPipeline,
-}
+pub(crate) trait PipelineType {}
+
+pub(crate) struct ShadowPass;
+
+impl PipelineType for ShadowPass {}
+
+pub(crate) struct OpaquePass;
+
+impl PipelineType for OpaquePass {}
+
+pub(crate) struct TranslucentPass;
+
+impl PipelineType for TranslucentPass {}
 
 #[derive(Resource)]
-pub(crate) struct MyShadowMapPipeline {
-    pub pipeline: RenderPipeline,
+pub(crate) struct MyRenderPipeline<Type: PipelineType> {
+    pub(crate) pipeline: RenderPipeline,
+    _phantom: PhantomData<Type>,
+}
+
+impl<T: PipelineType> MyRenderPipeline<T> {
+    fn new(pipeline: RenderPipeline) -> Self {
+        Self {
+            pipeline,
+            _phantom: PhantomData::<T>,
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -300,9 +321,9 @@ pub(crate) fn init_pipeline(
         },
     );
 
-    let pipeline = render_device.create_render_pipeline(
+    let opaque_pipeline = render_device.create_render_pipeline(
         &bevy::render::render_resource::RawRenderPipelineDescriptor {
-            label: Some("main pipeline"),
+            label: Some("opaque pipeline"),
             layout: Some(&layout),
             vertex: bevy::render::render_resource::RawVertexState {
                 module: &shader,
@@ -338,16 +359,55 @@ pub(crate) fn init_pipeline(
         },
     );
 
+    let translucent_pipeline = render_device.create_render_pipeline(
+        &bevy::render::render_resource::RawRenderPipelineDescriptor {
+            label: Some("translucent pipeline"),
+            layout: Some(&layout),
+            vertex: bevy::render::render_resource::RawVertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[vertex_layout.clone(), instance_layout.clone()],
+                compilation_options: default(),
+            },
+            fragment: Some(bevy::render::render_resource::RawFragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(bevy::render::render_resource::ColorTargetState {
+                    format: TextureFormat::bevy_default(),
+                    blend: Some(BlendState::ALPHA_BLENDING),
+                    write_mask: bevy::render::render_resource::ColorWrites::ALL,
+                })],
+                compilation_options: default(),
+            }),
+            primitive: bevy::render::render_resource::PrimitiveState {
+                topology: bevy::render::mesh::PrimitiveTopology::TriangleStrip,
+                cull_mode: Some(bevy::render::render_resource::Face::Back),
+                ..Default::default()
+            },
+            depth_stencil: Some(bevy::render::render_resource::DepthStencilState {
+                format: depth_texture.format,
+                depth_write_enabled: false,
+                depth_compare: bevy::render::render_resource::CompareFunction::Greater,
+                stencil: bevy::render::render_resource::StencilState::default(),
+                bias: bevy::render::render_resource::DepthBiasState::default(),
+            }),
+            multisample: default(),
+            multiview: None,
+            cache: None,
+        },
+    );
+
     commands.insert_resource(MainPassDepth(depth_texture));
-    commands.insert_resource(MyRenderPipeline { pipeline });
     commands.insert_resource(ShadowPassDepth(shadow_map));
     commands.insert_resource(ShadowMapTextureBindGroup {
         bind_group: shadow_map_bind_group,
         layout: shadow_map_bind_group_layout,
     });
-    commands.insert_resource(MyShadowMapPipeline {
-        pipeline: shadow_pass_pipeline,
-    });
+    commands.insert_resource(MyRenderPipeline::<ShadowPass>::new(shadow_pass_pipeline));
+    commands.insert_resource(MyRenderPipeline::<OpaquePass>::new(opaque_pipeline));
+    commands.insert_resource(MyRenderPipeline::<TranslucentPass>::new(
+        translucent_pipeline,
+    ));
 }
 
 pub(crate) fn resize_depth_texture(

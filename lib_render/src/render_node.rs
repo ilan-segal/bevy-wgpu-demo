@@ -12,8 +12,8 @@ use bevy::render::view::ViewTarget;
 use bevy::{prelude::*, render::renderer::RenderQueue};
 
 use crate::pipeline::{
-    GlobalsUniformBindGroup, GlobalsUniformBuffer, IndexBuffer, MainPassDepth, MyShadowMapPipeline,
-    ShadowMapTextureBindGroup, ShadowPassDepth, ShadowPassGlobalsUniformBindGroup,
+    GlobalsUniformBindGroup, GlobalsUniformBuffer, IndexBuffer, MainPassDepth,
+    ShadowMapTextureBindGroup, ShadowPass, ShadowPassDepth, ShadowPassGlobalsUniformBindGroup,
     ShadowPassGlobalsUniformBuffer,
 };
 use crate::texture::TextureBindGroup;
@@ -35,7 +35,7 @@ impl ViewNode for MyRenderNode {
     type ViewQuery = ();
 
     fn update(&mut self, world: &mut World) {
-        if !world.contains_resource::<MyRenderPipeline>() {
+        if !world.contains_resource::<MyRenderPipeline<crate::pipeline::OpaquePass>>() {
             return;
         }
         // Update globals buffer
@@ -51,10 +51,15 @@ impl ViewNode for MyRenderNode {
         globals.projection_matrix = projection_matrix.to_cols_array_2d();
         globals.camera_position = camera_position.to_array();
         if let Some(AmbientLight(colour)) = world.get_resource::<AmbientLight>() {
-            globals.ambient_light = colour.to_srgba().to_f32_array_no_alpha();
+            globals.ambient_light = colour
+                .to_srgba()
+                .to_f32_array_no_alpha();
         }
         if let Some(directional_light) = world.get_resource::<DirectionalLight>() {
-            globals.directional_light = directional_light.color.to_srgba().to_f32_array_no_alpha();
+            globals.directional_light = directional_light
+                .color
+                .to_srgba()
+                .to_f32_array_no_alpha();
             globals.directional_light_direction = directional_light.direction.to_array();
             const SHADOW_SIZE: f32 = 128.0;
             const NEGATIVE_Z: Mat4 = Mat4::from_cols_array_2d(&[
@@ -79,7 +84,10 @@ impl ViewNode for MyRenderNode {
             globals.shadow_map_projection = shadow_projection.to_cols_array_2d();
         }
         if let Some(fog_settings) = world.get_resource::<FogSettings>() {
-            globals.fog_color = fog_settings.color.to_linear().to_f32_array_no_alpha();
+            globals.fog_color = fog_settings
+                .color
+                .to_linear()
+                .to_f32_array_no_alpha();
             globals.fog_b = fog_settings.b;
         }
 
@@ -104,12 +112,12 @@ impl ViewNode for MyRenderNode {
         _view_query: <Self::ViewQuery as QueryData>::Item<'_>,
         world: &'_ World,
     ) -> std::result::Result<(), bevy::render::render_graph::NodeRunError> {
-        if !world.contains_resource::<MyRenderPipeline>() {
+        if !world.contains_resource::<MyRenderPipeline<crate::pipeline::OpaquePass>>() {
             return Ok(());
         }
-        let shadow_pipeline = world.resource::<MyShadowMapPipeline>();
+        let shadow_pipeline = world.resource::<MyRenderPipeline<ShadowPass>>();
         let shadow_depth = world.resource::<ShadowPassDepth>();
-        let main_pipeline = world.resource::<MyRenderPipeline>();
+        let main_pipeline = world.resource::<MyRenderPipeline<crate::pipeline::OpaquePass>>();
         let VertexBuffer { vertex_buffer, .. } = world.resource::<VertexBuffer>();
         let IndexBuffer {
             buffer: index_buffer,
@@ -213,7 +221,9 @@ impl ViewNode for MyRenderNode {
             };
 
             {
-                let mut pass = render_context.command_encoder().begin_render_pass(&desc);
+                let mut pass = render_context
+                    .command_encoder()
+                    .begin_render_pass(&desc);
                 pass.set_pipeline(&main_pipeline.pipeline);
                 pass.set_bind_group(0, globals_uniform_bind_group, &[]);
                 pass.set_bind_group(1, texture_bind_group, &[]);
