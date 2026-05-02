@@ -83,8 +83,8 @@ struct InstanceInput {
     /// - 10-14: Local z (5 bits, 0-31)
     /// - 15-26: Ambient occlusion factors (3 bits each, 4 values, 0-4)
     /// - 27-29: Normal
-    /// - 30-31: Texture index
     @location(4) data: u32,
+    @location(5) material_index: u32,
 };
 
 struct VertexOutput {
@@ -158,7 +158,7 @@ fn vs_main(
     let a2 = ambient_occlusion_factor(f32((instance.data >> 21) & 7));
     let a3 = ambient_occlusion_factor(f32((instance.data >> 24) & 7));
     out.ambient_occlusion_factor = bilerp(a0, a2, a1, a3, in.uv.x, in.uv.y);
-    out.material_index = instance.data >> 30;
+    out.material_index = instance.material_index;
     return out;
 }
 

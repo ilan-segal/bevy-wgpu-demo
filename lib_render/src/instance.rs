@@ -17,8 +17,8 @@ pub struct RawInstance {
     /// - 10-14: Local z (5 bits, 0-31)
     /// - 15-26: Ambient occlusion factors (3 bits each, 4 values, 0-4)
     /// - 27-29: Normal
-    /// - 30-31: Texture index
     data: u32,
+    material_index: u32,
 }
 
 impl From<Instance> for RawInstance {
@@ -30,18 +30,25 @@ impl From<Instance> for RawInstance {
                 | ((value.local_pos[1] as u32) << 5)
                 | ((value.local_pos[2] as u32) << 10)
                 | (ambient_occlusions << 15)
-                | ((value.normal as u32) << 27)
-                | (value.texture_index << 30),
+                | ((value.normal as u32) << 27),
+            material_index: value.texture_index,
         }
     }
 }
 
 impl RawInstance {
-    pub fn desc() -> [VertexAttribute; 1] {
-        [VertexAttribute {
-            format: VertexFormat::Uint32,
-            offset: 0,
-            shader_location: 4,
-        }]
+    pub fn desc() -> [VertexAttribute; 2] {
+        [
+            VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: 0,
+                shader_location: 4,
+            },
+            VertexAttribute {
+                format: VertexFormat::Uint32,
+                offset: std::mem::size_of::<u32>() as _,
+                shader_location: 5,
+            },
+        ]
     }
 }
