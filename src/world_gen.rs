@@ -100,20 +100,29 @@ struct BlockGenerationData {
 #[derive(Component, Clone, SpatiallyMapped3d)]
 pub struct Blocks(Array3<Block>);
 
+const BEDROCK_DEPTH: i32 = -128;
+const WORLD_AMPLITUDE: f32 = 10.;
+
 fn assign_blocks(
     mut commands: Commands,
     q_chunks: Query<BlockGenerationData, (With<Chunk>, Without<Blocks>)>,
 ) {
-    const WORLD_AMPLITUDE: f32 = 10.;
     for item in q_chunks.iter() {
         let chunk_y = item.chunk_position.0.y * CHUNK_SIZE as i32;
         let blocks = Array3::from_shape_fn((CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE), |(x, y, z)| {
             let height_sample = *item.height_noise.at_pos([x, z]);
             let true_y = (y as i32 + chunk_y) as f32;
-            if true_y + 1. < height_sample * WORLD_AMPLITUDE {
+            let ground_height = height_sample * WORLD_AMPLITUDE;
+            if true_y + 1. < BEDROCK_DEPTH as _ {
+                Block::Air
+            } else if true_y < BEDROCK_DEPTH as _ {
+                Block::Bedrock
+            } else if true_y + 2. < ground_height {
                 Block::Stone
-            } else if true_y < height_sample * WORLD_AMPLITUDE {
+            } else if true_y + 1. < ground_height {
                 Block::Dirt
+            } else if true_y < ground_height {
+                Block::Grass
             } else {
                 Block::Air
             }

@@ -124,7 +124,7 @@ fn get_quad_on_face(
 ) -> Option<TerrainQuad> {
     let ty = blocks
         .at_pos(&pos)
-        .map(|block| Terrain::try_from(*block).ok())
+        .map(|block| Terrain::try_from((*block, *normal)).ok())
         .flatten()?;
     let pos = IVec3::from(pos);
     let other_pos = pos + normal.as_unit_direction();
