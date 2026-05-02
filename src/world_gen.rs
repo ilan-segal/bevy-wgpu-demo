@@ -101,6 +101,7 @@ struct BlockGenerationData {
 pub struct Blocks(Array3<Block>);
 
 const BEDROCK_DEPTH: i32 = -128;
+const DIRT_LAYER_THICKNESS: u32 = 3;
 const WORLD_AMPLITUDE: f32 = 10.;
 
 fn assign_blocks(
@@ -117,7 +118,7 @@ fn assign_blocks(
                 Block::Air
             } else if true_y < BEDROCK_DEPTH as _ {
                 Block::Bedrock
-            } else if true_y + 2. < ground_height {
+            } else if (true_y + (DIRT_LAYER_THICKNESS + 1) as f32) < ground_height {
                 Block::Stone
             } else if true_y + 1. < ground_height {
                 Block::Dirt
