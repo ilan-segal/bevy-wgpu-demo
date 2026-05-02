@@ -172,10 +172,6 @@ fn update_instance_buffer<TerrainType: Send + Sync + texture::TextureIndex>(
     q_quads: Extract<Query<(&Quads<TerrainType>, &TerrainPosition), Changed<Quads<TerrainType>>>>,
     indices: Extract<Res<texture::TerrainColorTextureIndices>>,
 ) {
-    // let Some(indices) = indices.deref() else {
-    //     info!("gluh");
-    //     return;
-    // };
     for (quads, chunk_position) in q_quads.iter() {
         if quads.0.is_empty() {
             continue;
@@ -206,13 +202,11 @@ fn update_instance_buffer<TerrainType: Send + Sync + texture::TextureIndex>(
 
 fn create_instance<TerrainType: texture::TextureIndex>(
     quad: &Quad<TerrainType>,
-    // chunk_position: &TerrainPosition,
     indices: &texture::TerrainColorTextureIndices,
 ) -> instance::Instance {
     instance::Instance {
         normal: quad.normal,
         local_pos: quad.pos.to_array().map(|x| x as _),
-        // chunk_pos: chunk_position.0.to_array(),
         texture_index: *indices.get_index(&quad.ty).expect("Terrain texture index") as _,
         ambient_occlusion: quad.ambient_occlusion,
     }
