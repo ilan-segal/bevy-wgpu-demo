@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, num::NonZero, ops::Deref};
+use std::{marker::PhantomData, num::NonZero, ops::Deref, sync::Arc};
 
 use bevy::{
     platform::collections::HashMap,
@@ -48,6 +48,13 @@ impl<TerrainType: 'static + Send + Sync + texture::TextureIndex + IntoEnumIterat
                 vertex::VertexPlugin,
                 texture::TexturePlugin::<TerrainType>::new(),
             ))
+            .add_systems(
+                Update,
+                (
+                    update_quads_for_lod::<TerrainType>,
+                    insert_quads_from_lod::<TerrainType>,
+                ),
+            )
             .sub_app_mut(bevy::render::RenderApp)
             .init_resource::<globals::StartupTime>()
             .init_resource::<globals::CameraData>()
@@ -212,9 +219,10 @@ fn create_instance<TerrainType: texture::TextureIndex>(
     }
 }
 
-#[derive(Component)]
-pub struct Quads<TerrainType>(pub Vec<Quad<TerrainType>>);
+#[derive(Component, Clone)]
+pub struct Quads<TerrainType>(pub Arc<Vec<Quad<TerrainType>>>);
 
+#[derive(Clone)]
 pub struct Quad<TerrainType> {
     pub ty: TerrainType,
     pub normal: Normal,
@@ -245,6 +253,69 @@ impl Normal {
             Self::NegY => IVec3::NEG_Y,
             Self::PosZ => IVec3::Z,
             Self::NegZ => IVec3::NEG_Z,
+        }
+    }
+}
+
+#[derive(Component, Default)]
+pub struct DetailLevel(pub u32);
+
+#[derive(Component)]
+#[require(DetailLevel)]
+pub struct LevelsOfDetail<TerrainType> {
+    levels: Vec<Quads<TerrainType>>,
+}
+
+impl<TerrainType: Clone> LevelsOfDetail<TerrainType> {
+    pub fn new(levels: &[Quads<TerrainType>]) -> Result<Self, &str> {
+        if levels.len() == 0 {
+            return Err("Constructor requires at least one element");
+        }
+        Ok(Self {
+            levels: levels.to_vec(),
+        })
+    }
+}
+
+impl<TerrainType> LevelsOfDetail<TerrainType> {
+    pub fn get_levels(&self) -> &Vec<Quads<TerrainType>> {
+        &self.levels
+    }
+}
+
+fn insert_quads_from_lod<TerrainType: 'static + Send + Sync>(
+    mut commands: Commands,
+    q_lod: Query<(Entity, &LevelsOfDetail<TerrainType>, &DetailLevel), Without<Quads<TerrainType>>>,
+) {
+    for (entity, LevelsOfDetail { levels }, DetailLevel(level)) in q_lod.iter() {
+        let quads = levels.get(*level as usize).or_else(|| levels.iter().last());
+        if let Some(new_quads) = quads {
+            commands
+                .entity(entity)
+                .insert((Quads(new_quads.0.clone()), DetailLevel(1)));
+        } else {
+            warn!("Could not resolve LoD quads for insert {}", entity);
+        }
+    }
+}
+
+fn update_quads_for_lod<TerrainType: 'static + Send + Sync>(
+    mut q_quads: Query<
+        (
+            Entity,
+            &mut Quads<TerrainType>,
+            &LevelsOfDetail<TerrainType>,
+            &DetailLevel,
+        ),
+        Or<(Changed<DetailLevel>, Changed<LevelsOfDetail<TerrainType>>)>,
+    >,
+) {
+    for (entity, mut quads, LevelsOfDetail { levels }, DetailLevel(level)) in q_quads.iter_mut() {
+        let maybe_new_quad = levels.get(*level as usize).or_else(|| levels.iter().last());
+        if let Some(new_quads) = maybe_new_quad {
+            quads.0 = new_quads.0.clone();
+        } else {
+            warn!("Could not resolve LoD quads for update {}", entity);
         }
     }
 }

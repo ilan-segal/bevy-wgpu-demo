@@ -190,6 +190,17 @@ where
         let index = xn + 3 * yn + 9 * zn;
         return self.chunks[index].as_ref().map(|c| c.at_pos([xl, yl, zl]));
     }
+
+    /// Level of detail
+    pub fn at_pos_lod(&self, pos: &[i32; 3], lod: &u32) -> Option<&T::Item> {
+        fn floor_mod(a: i32, n: i32) -> i32 {
+            // This formula handles negative 'a' correctly
+            ((a % n) + n) % n
+        }
+        let adjust = |n: i32| n - floor_mod(n, 1 << lod);
+        let adjusted_pos = pos.map(adjust);
+        self.at_pos(&adjusted_pos)
+    }
 }
 
 #[derive(Event)]

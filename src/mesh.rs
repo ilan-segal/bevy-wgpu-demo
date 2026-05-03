@@ -1,4 +1,4 @@
-use std::num::NonZero;
+use std::{num::NonZero, sync::Arc};
 
 use bevy::prelude::*;
 use lib_async_component::{AsyncComponentPlugin, ComputeTasks};
@@ -21,10 +21,11 @@ impl Plugin for WorldMeshPlugin {
             .add_observer(update_quad_count_for_despawn)
             .add_observer(update_quad_count_for_replace)
             .add_observer(update_quad_count_for_insert)
-            .add_plugins(AsyncComponentPlugin::<TerrainQuads>::new());
+            .add_plugins(AsyncComponentPlugin::<TerrainQuadsLod>::new());
     }
 }
 
+type TerrainQuadsLod = lib_render::LevelsOfDetail<Terrain>;
 type TerrainQuads = lib_render::Quads<Terrain>;
 type TerrainQuad = lib_render::Quad<Terrain>;
 
@@ -78,7 +79,7 @@ fn assign_quads(
         (Entity, &Neighborhood<Blocks>),
         (With<Chunk>, Changed<Neighborhood<Blocks>>),
     >,
-    mut compute_tasks: ResMut<ComputeTasks<TerrainQuads>>,
+    mut compute_tasks: ResMut<ComputeTasks<TerrainQuadsLod>>,
 ) {
     for (entity, blocks) in q_unmeshed_chunks.iter() {
         let blocks = blocks.clone();
@@ -87,23 +88,34 @@ fn assign_quads(
     }
 }
 
-fn get_quads(blocks: Neighborhood<Blocks>, meshing_type: MeshingType) -> TerrainQuads {
+fn get_quads(blocks: Neighborhood<Blocks>, meshing_type: MeshingType) -> TerrainQuadsLod {
+    const MAX_LOD: u32 = 3;
     let quads = match meshing_type {
-        MeshingType::Naive => get_quads_naive(&blocks),
+        MeshingType::Naive => (0..MAX_LOD)
+            .map(|lod| get_quads_naive(&blocks, &lod))
+            .collect::<Vec<_>>(),
     };
-    lib_render::Quads(quads)
+    lib_render::LevelsOfDetail::new(
+        quads
+            .iter()
+            .map(|quad| lib_render::Quads(Arc::new(quad.clone())))
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )
+    .unwrap()
 }
 
-fn get_quads_naive(blocks: &Neighborhood<Blocks>) -> Vec<TerrainQuad> {
+fn get_quads_naive(blocks: &Neighborhood<Blocks>, lod: &u32) -> Vec<TerrainQuad> {
     cube_iter(0..32)
         .map(|(x, y, z)| [x, y, z])
-        .flat_map(|pos| get_quads_around_block(blocks, pos))
+        .flat_map(|pos| get_quads_around_block(blocks, pos, &lod))
         .collect()
 }
 
 fn get_quads_around_block(
     blocks: &Neighborhood<Blocks>,
     pos: [i32; 3],
+    lod: &u32,
 ) -> impl Iterator<Item = TerrainQuad> {
     [
         Normal::PosX,
@@ -114,22 +126,23 @@ fn get_quads_around_block(
         Normal::NegZ,
     ]
     .iter()
-    .filter_map(move |normal| get_quad_on_face(blocks, pos, normal))
+    .filter_map(move |normal| get_quad_on_face(blocks, &pos, normal, lod))
 }
 
 fn get_quad_on_face(
     blocks: &Neighborhood<Blocks>,
-    pos: [i32; 3],
+    pos: &[i32; 3],
     normal: &Normal,
+    lod: &u32,
 ) -> Option<TerrainQuad> {
     let ty = blocks
-        .at_pos(&pos)
+        .at_pos_lod(&pos, &lod)
         .map(|block| Terrain::try_from((*block, *normal)).ok())
         .flatten()?;
-    let pos = IVec3::from(pos);
+    let pos = IVec3::from(*pos);
     let other_pos = pos + normal.as_unit_direction();
     let other_block = blocks
-        .at_pos(&other_pos.into())
+        .at_pos_lod(&other_pos.into(), &lod)
         .cloned()
         .unwrap_or_default();
     if !other_block.is_transparent() {
@@ -142,7 +155,7 @@ fn get_quad_on_face(
         height: NonZero::new(1).unwrap(),
         pos,
         ambient_occlusion: [0, 1, 2, 3]
-            .map(|idx| get_ambient_occlusion_factor(blocks, pos, normal, idx)),
+            .map(|idx| get_ambient_occlusion_factor(blocks, pos, normal, idx, lod)),
     };
     return Some(quad);
 }
@@ -152,6 +165,7 @@ fn get_ambient_occlusion_factor(
     pos: IVec3,
     normal: &Normal,
     corner_index: u8,
+    lod: &u32,
 ) -> u8 {
     let (a0, a1) = get_perpendicular_axes(normal);
     let one_layer_up = normal.as_unit_direction() + pos;
@@ -167,7 +181,7 @@ fn get_ambient_occlusion_factor(
         };
     let is_solid = |p: IVec3| {
         blocks
-            .at_pos(&p.to_array())
+            .at_pos_lod(&p.to_array(), lod)
             .map(|block| !block.is_transparent())
             .unwrap_or(false)
     };
