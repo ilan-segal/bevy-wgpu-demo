@@ -72,7 +72,7 @@ impl ViewNode for MyRenderNode {
                     -SHADOW_SIZE * 2.,
                     SHADOW_SIZE * 2.,
                 )
-                * Transform::from_translation(Vec3::ZERO)
+                * Transform::from_translation(globals.camera_position.into())
                     .looking_to(directional_light.direction, Vec3::Y)
                     .compute_matrix()
                     .inverse();
