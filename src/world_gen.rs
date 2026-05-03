@@ -6,7 +6,7 @@ use lib_chunk::{ChunkPosition, NeighborhoodPlugin};
 use lib_noise::FractalNoise;
 use lib_spatial::{CHUNK_SIZE, SpatiallyMapped};
 use lib_spatial_macro::{SpatiallyMapped2d, SpatiallyMapped3d};
-use lib_utils::cube_iter;
+use lib_utils::iter_3d;
 use ndarray::{Array2, Array3};
 use noise::NoiseFn;
 
@@ -32,7 +32,13 @@ impl Plugin for WorldGenerationPlugin {
 }
 
 fn spawn_chunk_at_center_of_world(mut commands: Commands) {
-    for (x, y, z) in cube_iter(-5..=5) {
+    const RADIUS_HORIZONTAL: i32 = 10;
+    const RADIUS_VERTICAL: i32 = 1;
+    for (x, y, z) in iter_3d(
+        -RADIUS_HORIZONTAL..=RADIUS_HORIZONTAL,
+        -RADIUS_VERTICAL..=RADIUS_VERTICAL,
+        -RADIUS_HORIZONTAL..=RADIUS_HORIZONTAL,
+    ) {
         let pos = IVec3::new(x, y, z);
         commands.spawn((Chunk, ChunkPosition(pos)));
     }
